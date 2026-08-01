@@ -2024,19 +2024,25 @@ export default function App() {
               toggleFileBrowser={toggleFileBrowser}
               isFileBrowserCollapsed={isFileBrowserCollapsed}
               explorerHeight={explorerHeight}
-              handleDividerMouseDown={handleDividerMouseDown}
+              setExplorerHeight={updateExplorerHeight}
               theme={theme}
               openFolderPicker={openFolderPicker}
+              isDraggingFile={isDraggingFile}
               addRecentProcess={addRecentProcess}
               setGlobalProgress={setGlobalProgress}
               explorerPreviewFile={explorerPreviewFile}
               setExplorerPreviewFile={setExplorerPreviewFile}
+              onOpenFullscreenPreview={setFullscreenPreviewFile}
             />
           )}
 
           {activeTab === 'color-studio' && (
             <ColorStudio
               theme={theme}
+              explorerHeight={explorerHeight}
+              setExplorerHeight={updateExplorerHeight}
+              isFileBrowserCollapsed={isFileBrowserCollapsed}
+              toggleFileBrowser={toggleFileBrowser}
             />
           )}
 
@@ -2059,9 +2065,10 @@ export default function App() {
               toggleFileBrowser={toggleFileBrowser}
               isFileBrowserCollapsed={isFileBrowserCollapsed}
               explorerHeight={explorerHeight}
-              setExplorerHeight={setExplorerHeight}
+              setExplorerHeight={updateExplorerHeight}
               theme={theme}
               openFolderPicker={openFolderPicker}
+              isDraggingFile={isDraggingFile}
               addRecentProcess={addRecentProcess}
               setGlobalProgress={setGlobalProgress}
               mode="compress"
@@ -2075,9 +2082,10 @@ export default function App() {
               toggleFileBrowser={toggleFileBrowser}
               isFileBrowserCollapsed={isFileBrowserCollapsed}
               explorerHeight={explorerHeight}
-              setExplorerHeight={setExplorerHeight}
+              setExplorerHeight={updateExplorerHeight}
               theme={theme}
               openFolderPicker={openFolderPicker}
+              isDraggingFile={isDraggingFile}
               addRecentProcess={addRecentProcess}
               setGlobalProgress={setGlobalProgress}
               mode="extract"
@@ -2091,9 +2099,10 @@ export default function App() {
               toggleFileBrowser={toggleFileBrowser}
               isFileBrowserCollapsed={isFileBrowserCollapsed}
               explorerHeight={explorerHeight}
-              handleDividerMouseDown={handleDividerMouseDown}
+              setExplorerHeight={updateExplorerHeight}
               theme={theme}
               openFolderPicker={openFolderPicker}
+              isDraggingFile={isDraggingFile}
               addRecentProcess={addRecentProcess}
               setGlobalProgress={setGlobalProgress}
             />
@@ -2106,9 +2115,10 @@ export default function App() {
               toggleFileBrowser={toggleFileBrowser}
               isFileBrowserCollapsed={isFileBrowserCollapsed}
               explorerHeight={explorerHeight}
-              handleDividerMouseDown={handleDividerMouseDown}
+              setExplorerHeight={updateExplorerHeight}
               theme={theme}
               openFolderPicker={openFolderPicker}
+              isDraggingFile={isDraggingFile}
               addRecentProcess={addRecentProcess}
               setGlobalProgress={setGlobalProgress}
             />
@@ -2121,13 +2131,18 @@ export default function App() {
               toggleFileBrowser={toggleFileBrowser}
               isFileBrowserCollapsed={isFileBrowserCollapsed}
               explorerHeight={explorerHeight}
-              handleDividerMouseDown={handleDividerMouseDown}
+              setExplorerHeight={updateExplorerHeight}
               theme={theme}
               openFolderPicker={openFolderPicker}
+              isDraggingFile={isDraggingFile}
               addRecentProcess={addRecentProcess}
               setGlobalProgress={setGlobalProgress}
+              explorerPreviewFile={explorerPreviewFile}
+              setExplorerPreviewFile={setExplorerPreviewFile}
+              onOpenFullscreenPreview={setFullscreenPreviewFile}
             />
           )}
+
 
           {activeTab === 'case-converter' && (
             <CaseConverter theme={theme} />
