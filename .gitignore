@@ -1,0 +1,26 @@
+# Dependency directories
+node_modules/
+client/node_modules/
+
+# Build outputs
+dist/
+client/dist/
+
+# System and temporary files
+.DS_Store
+Thumbs.db
+*.log
+*.bak
+fe_def.txt
+fe_def_long.txt
+fe_found.txt
+fe_extracted.txt
+fe_found_un.txt
+fe_found.txt.un
+
+# IDE and environment files
+.env
+.idea/
+.vscode/
+.gemini/
+.agy/
