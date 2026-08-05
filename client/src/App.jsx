@@ -744,7 +744,72 @@ function FrameExtractor({ videoFile, setVideoFile, setGlobalProgress, theme, ope
   );
 }
 
-export default function App() {
+export default 
+function GlobalFolderPickerModal({ isOpen, initialPath, onClose, onSelect, theme }) {
+  const [currentPath, setCurrentPath] = useState(initialPath || '');
+  const [parentPath, setParentPath] = useState('');
+  const [folders, setFolders] = useState([]);
+  const [error, setError] = useState('');
+
+  const loadFolders = async (dirPath) => {
+    try {
+      const res = await fetch(`${API_BASE}/scan-dir?path=` + encodeURIComponent(dirPath));
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to read directory');
+      setCurrentPath(data.currentPath);
+      setParentPath(data.parentPath || '');
+      setFolders((data.items || []).filter(i => i.isDir));
+      setError('');
+    } catch (e) { setError(e.message); }
+  };
+
+  useEffect(() => {
+    if (isOpen) loadFolders(initialPath || '');
+  }, [isOpen, initialPath]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999999 }} onClick={onClose}>
+      <div className="glass-card animate-scale-up" onClick={(e) => e.stopPropagation()} style={{ width: '500px', padding: '20px', borderRadius: '12px', background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--glass-border)', paddingBottom: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <FolderOpen size={18} color="var(--primary-color)" />
+            <h3 style={{ fontSize: '15px', fontWeight: 'bold', color: 'var(--color-white)', margin: 0 }}>Select Directory</h3>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--color-slate)', cursor: 'pointer' }}><X size={18} /></button>
+        </div>
+
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+          <button onClick={() => loadFolders(parentPath)} disabled={!parentPath} className="btn-secondary" style={{ padding: '6px 10px', borderRadius: '4px' }} title="Go Up"><ArrowLeft size={12} /></button>
+          <input type="text" className="form-input" value={currentPath} onChange={(e) => setCurrentPath(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && loadFolders(currentPath)} style={{ flexGrow: 1, padding: '6px 10px', fontSize: '12px' }} />
+        </div>
+
+        <div style={{ height: '220px', overflowY: 'auto', border: '1px solid var(--glass-border)', borderRadius: '6px', background: 'rgba(0,0,0,0.15)', padding: '6px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          {error ? (
+            <div style={{ color: '#EF4444', fontSize: '11px', textAlign: 'center', padding: '10px' }}>{error}</div>
+          ) : folders.length === 0 ? (
+            <div style={{ color: 'var(--color-slate)', fontSize: '11px', textAlign: 'center', padding: '10px' }}>No subfolders found</div>
+          ) : (
+            folders.map(f => (
+              <div key={f.path} onClick={() => loadFolders(f.path)} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer', background: 'transparent' }} className="hover-bright">
+                <FolderOpen size={14} color="var(--primary-color)" />
+                <span style={{ fontSize: '12px', color: 'var(--color-white)' }}>{f.name}</span>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid var(--glass-border)', paddingTop: '10px' }}>
+          <button onClick={onClose} className="btn-secondary" style={{ padding: '6px 14px', fontSize: '12px' }}>Cancel</button>
+          <button onClick={() => onSelect(currentPath)} className="btn-primary" style={{ padding: '6px 16px', fontSize: '12px' }}>Select Folder</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [serverOnline, setServerOnline] = useState(false);
   const [theme, setTheme] = useState(() => localStorage.getItem('rfine_theme') || 'dark');
@@ -1507,6 +1572,16 @@ export default function App() {
         </div>
       </main>
       <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} theme={theme} />
+      <GlobalFolderPickerModal 
+        isOpen={globalFolderPickerOpen} 
+        initialPath={globalFolderPickerPath} 
+        onClose={() => setGlobalFolderPickerOpen(false)} 
+        onSelect={(selectedPath) => {
+          if (globalFolderPickerCallback) globalFolderPickerCallback(selectedPath);
+          setGlobalFolderPickerOpen(false);
+        }} 
+        theme={theme} 
+      />
     </div>
   );
 }
@@ -2148,7 +2223,7 @@ function ImageResizer({ files, onFilesChange, toggleFileBrowser, isFileBrowserCo
 
 // ----------------------------------------------------------------------------
 function WatermarkerStudio({ files, setFiles, setGlobalProgress, explorerPreviewFile, setExplorerPreviewFile, theme, openFolderPicker, isDraggingFile, explorerHeight, setExplorerHeight, addRecentProcess, onOpenFullscreenPreview, isFileBrowserCollapsed, toggleFileBrowser }) {
-  const [watermark, setWatermark] = useState(() => localStorage.getItem('rfine_wm_watermark') || ''); // base64 DataURL of watermark image
+  const [watermark, setWatermark] = useState(() => localStorage.getItem('rfine_wm_watermark') || '');
   const [watermarkType, setWatermarkType] = useState(() => localStorage.getItem('rfine_wm_type') || 'image'); 
   const [watermarkText, setWatermarkText] = useState(() => localStorage.getItem('rfine_wm_text') || 'RFINE Copyright'); 
   const [watermarkOpacity, setWatermarkOpacity] = useState(() => parseFloat(localStorage.getItem('rfine_wm_opacity')) || 0.35);
@@ -2156,362 +2231,134 @@ function WatermarkerStudio({ files, setFiles, setGlobalProgress, explorerPreview
   const [watermarkPosition, setWatermarkPosition] = useState(() => localStorage.getItem('rfine_wm_position') || 'bottom-right');
   const [watermarkFileName, setWatermarkFileName] = useState(() => localStorage.getItem('rfine_wm_filename') || '');
   
-  // Custom Drag coordinate percentages (defaults to bottom-right)
   const [watermarkX, setWatermarkX] = useState(() => parseFloat(localStorage.getItem('rfine_wm_x')) || 82);
   const [watermarkY, setWatermarkY] = useState(() => parseFloat(localStorage.getItem('rfine_wm_y')) || 82);
   const [isDragging, setIsDragging] = useState(false);
-  const [modalPos, setModalPos] = useState({ x: 60, y: 100 });
-  const [dragStart, setDragStart] = useState(null);
+  const [isFullscreenAdjusterOpen, setIsFullscreenAdjusterOpen] = useState(false);
 
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
+  const [activePreviewFile, setActivePreviewFile] = useState(null);
+  const [successResult, setSuccessResult] = useState(null);
+  const [processing, setProcessing] = useState(false);
 
-  const handleDragStart = (e, idx) => {
-    e.dataTransfer.effectAllowed = 'move';
-    setDraggedIndex(idx);
-    window.isDraggingQueueItem = true;
-  };
-
-  const handleDragOver = (e, idx) => {
-    e.preventDefault();
-    setDragOverIndex(idx);
-  };
-
-  const handleDragLeave = () => {
-    setDragOverIndex(null);
-  };
-
-  const handleDragEnd = () => {
-    setDraggedIndex(null);
-    setDragOverIndex(null);
-    window.isDraggingQueueItem = false;
-  };
-
-  const handleDrop = (e, idx) => {
-    e.preventDefault();
-    if (draggedIndex === null) return;
-    const reordered = [...files];
-    const [removed] = reordered.splice(draggedIndex, 1);
-    reordered.splice(idx, 0, removed);
-    setFiles(reordered);
-    setDraggedIndex(null);
-    setDragOverIndex(null);
-    window.isDraggingQueueItem = false;
-  };
-
-
-
-  const handleDividerMouseDown = (e) => {
-    e.preventDefault();
-    const startY = e.clientY;
-    const startHeight = explorerHeight;
-    const onMouseMove = (moveEvent) => {
-      const deltaY = moveEvent.clientY - startY;
-      const newHeight = Math.max(150, Math.min(600, startHeight + deltaY));
-      setExplorerHeight(newHeight);
-    };
-    const onMouseUp = () => {
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-    };
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
-  };
-
-  const [sectionConfigExpanded, setSectionConfigExpanded] = useState(true);
-  const [sectionSaveExpanded, setSectionSaveExpanded] = useState(true);
-
-  const handleModalMouseDown = (e) => {
-    // Only drag on left click and not if clicking inputs or buttons
-    if (e.button !== 0) return;
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || e.target.closest('button') || e.target.closest('input')) return;
-    setDragStart({
-      startX: e.clientX - modalPos.x,
-      startY: e.clientY - modalPos.y
-    });
-  };
-
-  const handleModalMouseMove = (e) => {
-    if (!dragStart) return;
-    setModalPos({
-      x: e.clientX - dragStart.startX,
-      y: e.clientY - dragStart.startY
-    });
-  };
-
-  const handleModalMouseUp = () => {
-    setDragStart(null);
-  };
-
-  useEffect(() => { localStorage.setItem('rfine_wm_watermark', watermark); }, [watermark]);
-  useEffect(() => { localStorage.setItem('rfine_wm_type', watermarkType); }, [watermarkType]);
-  useEffect(() => { localStorage.setItem('rfine_wm_text', watermarkText); }, [watermarkText]);
-  useEffect(() => { localStorage.setItem('rfine_wm_opacity', watermarkOpacity); }, [watermarkOpacity]);
-  useEffect(() => { localStorage.setItem('rfine_wm_size', watermarkSize); }, [watermarkSize]);
-  useEffect(() => { localStorage.setItem('rfine_wm_position', watermarkPosition); }, [watermarkPosition]);
-  useEffect(() => { localStorage.setItem('rfine_wm_filename', watermarkFileName); }, [watermarkFileName]);
-  useEffect(() => { localStorage.setItem('rfine_wm_x', watermarkX); }, [watermarkX]);
-  useEffect(() => { localStorage.setItem('rfine_wm_y', watermarkY); }, [watermarkY]);
-
-  const setPlacementPreset = (pos) => {
-    const size = watermarkSize || 15;
-    if (pos === 'top-left') {
-      setWatermarkX(3);
-      setWatermarkY(3);
-    } else if (pos === 'top-right') {
-      setWatermarkX(100 - size - 3);
-      setWatermarkY(3);
-    } else if (pos === 'center') {
-      setWatermarkX(50 - (size / 2));
-      setWatermarkY(50 - (size / 2));
-    } else if (pos === 'bottom-left') {
-      setWatermarkX(3);
-      setWatermarkY(100 - size - 3);
-    } else if (pos === 'bottom-right') {
-      setWatermarkX(100 - size - 3);
-      setWatermarkY(100 - size - 3);
-    }
-    setWatermarkPosition(pos);
-  };
-
-  const handleSizeChange = (newSize) => {
-    setWatermarkSize(newSize);
-    const pos = watermarkPosition;
-    if (pos === 'top-right') {
-      setWatermarkX(100 - newSize - 3);
-    } else if (pos === 'bottom-right') {
-      setWatermarkX(100 - newSize - 3);
-      setWatermarkY(100 - newSize - 3);
-    } else if (pos === 'bottom-left') {
-      setWatermarkY(100 - newSize - 3);
-    } else if (pos === 'center') {
-      setWatermarkX(50 - (newSize / 2));
-      setWatermarkY(50 - (newSize / 2));
-    }
-  };
-
-  const handleMouseDown = (e) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleMouseMove = (e) => {
-    if (!isDragging) return;
-    const container = e.currentTarget;
-    const rect = container.getBoundingClientRect();
-    let xPct = ((e.clientX - rect.left) / rect.width) * 100;
-    let yPct = ((e.clientY - rect.top) / rect.height) * 100;
-    
-    xPct = Math.max(0, Math.min(xPct - (watermarkSize / 2), 100 - watermarkSize));
-    yPct = Math.max(0, Math.min(yPct - (watermarkSize / 2), 100 - watermarkSize));
-    
-    setWatermarkX(xPct);
-    setWatermarkY(yPct);
-    setWatermarkPosition('custom');
-  };
-
-  const handleMouseUpOrLeave = () => {
-    setIsDragging(false);
-  };
-  
   const [saveDestMode, setSaveDestMode] = useState(() => localStorage.getItem('rfine_wm_save_dest_mode') || 'original');
-  const [saveCopyMode, setSaveCopyMode] = useState(() => localStorage.getItem('rfine_wm_save_copy_mode') || 'copy');
   const [customDestPath, setCustomDestPath] = useState(() => localStorage.getItem('rfine_wm_custom_dest_path') || '');
   const [openOnComplete, setOpenOnComplete] = useState(() => {
     const val = localStorage.getItem('rfine_wm_open_on_complete');
     return val === null ? true : val === 'true';
   });
 
-  useEffect(() => { localStorage.setItem('rfine_wm_open_on_complete', openOnComplete); }, [openOnComplete]);
-  useEffect(() => { localStorage.setItem('rfine_wm_save_dest_mode', saveDestMode); }, [saveDestMode]);
-  useEffect(() => { localStorage.setItem('rfine_wm_save_copy_mode', saveCopyMode); }, [saveCopyMode]);
-  useEffect(() => { localStorage.setItem('rfine_wm_custom_dest_path', customDestPath); }, [customDestPath]);
+  const [sectionConfigExpanded, setSectionConfigExpanded] = useState(true);
+  const [sectionSaveExpanded, setSectionSaveExpanded] = useState(true);
 
-  const handleBrowseDestFolder = () => {
-    openFolderPicker(customDestPath, (selectedPath) => {
-      setCustomDestPath(selectedPath);
-      setSaveDestMode('custom');
-    });
-  };
-  const [activePreviewFile, setActivePreviewFile] = useState(null);
-  const [processing, setProcessing] = useState(false);
-  const [successResult, setSuccessResult] = useState(null);
-
-  useEffect(() => {
-    if (explorerPreviewFile) {
-      setActivePreviewFile(explorerPreviewFile);
-    }
-  }, [explorerPreviewFile]);
-
-  const handleAddExplorerFiles = (newFiles) => {
-    setFiles(prev => {
-      const existingPaths = prev.map(f => f.path);
-      const filtered = newFiles.filter(nf => !existingPaths.includes(nf.path));
-      return [...prev, ...filtered];
-    });
-    if (newFiles.length > 0) {
-      setActivePreviewFile(newFiles[0]);
-    }
-    setSuccessResult(null);
+  const handleDragStart = (e, index) => setDraggedIndex(index);
+  const handleDragOver = (e, index) => { e.preventDefault(); setDragOverIndex(index); };
+  const handleDragLeave = () => setDragOverIndex(null);
+  const handleDragEnd = () => { setDraggedIndex(null); setDragOverIndex(null); };
+  const handleDrop = (e, targetIndex) => {
+    e.preventDefault();
+    if (draggedIndex === null) return;
+    const updated = [...files];
+    const item = updated.splice(draggedIndex, 1)[0];
+    updated.splice(targetIndex, 0, item);
+    setFiles(updated);
+    setDraggedIndex(null);
+    setDragOverIndex(null);
   };
 
   const handleRemoveFile = (index) => {
     setFiles(prev => prev.filter((_, i) => i !== index));
-    if (activePreviewFile === files[index]) {
-      setActivePreviewFile(null);
+    if (activePreviewFile === files[index]) setActivePreviewFile(null);
+  };
+
+  const handleBrowseDestFolder = () => {
+    if (openFolderPicker) {
+      openFolderPicker(customDestPath, (selectedPath) => {
+        if (selectedPath) {
+          setCustomDestPath(selectedPath);
+          setSaveDestMode('custom');
+          localStorage.setItem('rfine_wm_custom_dest_path', selectedPath);
+          localStorage.setItem('rfine_wm_save_dest_mode', 'custom');
+        }
+      });
     }
   };
 
   const handleApplyWatermark = async () => {
     if (files.length === 0) return;
-    if (watermarkType === 'image' && !watermark) {
-      alert('Please configure a watermark image first!');
-      return;
-    }
-    if (watermarkType === 'text' && !watermarkText) {
-      alert('Please configure a watermark text first!');
-      return;
-    }
     setProcessing(true);
     setSuccessResult(null);
-    setGlobalProgress({ active: true, percent: 0, label: 'Watermarking images...' });
-
-    // Cache image watermark once on server to prevent payload bottlenecks
-    if (watermarkType === 'image') {
-      try {
-        await fetch(`${API_BASE}/watermark/setup`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ watermark })
-        });
-      } catch (e) {
-        console.error('Failed to cache watermark on server:', e);
-      }
-    }
-
-    const total = files.length;
-    const processedList = [];
-    let lastSavedFolder = '';
-
-    for (let i = 0; i < total; i++) {
-      const file = files[i];
-      setGlobalProgress({
-        active: true,
-        percent: Math.round((i / total) * 100),
-        label: `Watermarking ${file.name} (${i + 1}/${total})...`
+    try {
+      const targetDir = saveDestMode === 'original' ? undefined : saveDestMode === 'default' ? (localStorage.getItem('rfine_def_save_dir') || undefined) : customDestPath || undefined;
+      const res = await fetch(`${API_BASE}/watermark/apply-local`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          files, watermarkType, watermarkText, watermark, watermarkOpacity, watermarkSize,
+          watermarkX, watermarkY,
+          outputFolder: targetDir
+        })
       });
-
-      try {
-        const fileRes = await fetch(`${API_BASE}/image/convert-local`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            files: [file],
-            format: file.name.substring(file.name.lastIndexOf('.') + 1) || 'png',
-            quality: 85,
-            resizeMode: 'none',
-            watermark: watermarkType === 'image' ? 'temp_watermark.png' : watermarkText,
-            watermarkType,
-            keepMetadata: true,
-            watermarkOpacity,
-            watermarkSize,
-            watermarkPosition,
-            watermarkX,
-            watermarkY,
-            replaceOriginal: saveCopyMode === 'replace',
-            fileSuffix: '_watermarked',
-            outputFolder: 
-              saveDestMode === 'original' ? undefined :
-              saveDestMode === 'default' ? (getDefaultOutputPath('rfine_def_image_dir') || undefined) :
-              customDestPath || undefined
-          })
-        });
-
-        const resData = await fileRes.json();
-        const singleResult = resData.results[0];
-
-        if (singleResult && singleResult.success) {
-          processedList.push(singleResult);
-          lastSavedFolder = singleResult.targetFolder;
-          if (addRecentProcess) {
-            addRecentProcess(
-              'Watermarker',
-              singleResult.name,
-              singleResult.originalSize,
-              singleResult.optimizedSize,
-              singleResult.targetFolder
-            );
-          }
-        }
-      } catch (err) {
-        console.error(err);
-      }
-    }
-
-    setGlobalProgress({ active: false, percent: 100, label: '' });
-    setProcessing(false);
-
-    if (processedList.length > 0) {
-      setSuccessResult({
-        results: processedList,
-        targetFolder: lastSavedFolder
-      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to apply watermark');
+      let lastSavedFolder = data.targetFolder || (files[0] && files[0].path ? files[0].path.substring(0, files[0].path.lastIndexOf('\\')) : '');
+      setSuccessResult({ results: data.results, targetFolder: lastSavedFolder, count: files.length });
 
       if (openOnComplete && lastSavedFolder) {
         try {
-          await fetch(`${API_BASE}/open-folder`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ folderPath: lastSavedFolder })
-          });
-        } catch (e) {
-          console.error(e);
-        }
+          await fetch(`${API_BASE}/open-folder`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ folderPath: lastSavedFolder }) });
+        } catch (e) {}
       }
-    } else {
-      alert('Failed to apply watermark. Please check if your watermark image or photos are valid.');
+    } catch (e) { alert('Processing failed: ' + e.message); }
+    finally { setProcessing(false); }
+  };
+
+  const handleWatermarkUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setWatermarkFileName(file.name);
+      const reader = new FileReader();
+      reader.onload = (uploadEvent) => setWatermark(uploadEvent.target.result);
+      reader.readAsDataURL(file);
     }
   };
 
-  const handleOpenCurrentFolder = async () => {
-    if (successResult && successResult.targetFolder) {
-      try {
-        await fetch(`${API_BASE}/open-folder`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ folderPath: successResult.targetFolder })
-        });
-      } catch (e) {
-        console.error(e);
-      }
-    }
+  const currentSelectedFile = activePreviewFile || files[0];
+
+  const handleCanvasMouseMove = (e) => {
+    if (!isDragging) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
+    const y = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
+    setWatermarkX(x);
+    setWatermarkY(y);
   };
 
   return (
-    <div className="workspace-layout">
-      {/* Middle Canvas: File Explorer + Processing Queue */}
-      <div className="middle-canvas">
-        <CollapsibleFileBrowser
-          isFileBrowserCollapsed={isFileBrowserCollapsed}
-          toggleFileBrowser={toggleFileBrowser}
-          explorerHeight={explorerHeight}
-          handleDividerMouseDown={handleDividerMouseDown}
-        >
+    <div style={{ display: 'flex', width: '100%', height: '100%', minWidth: 0, position: 'relative' }}>
+      <div className="middle-canvas" style={{ display: 'flex', flexDirection: 'column', height: '100%', minWidth: 0, overflowY: 'auto' }}>
+        <CollapsibleFileBrowser isFileBrowserCollapsed={isFileBrowserCollapsed} toggleFileBrowser={toggleFileBrowser} explorerHeight={explorerHeight} handleDividerMouseDown={handleDividerMouseDown}>
           <FileExplorer 
-            onAddFiles={handleAddExplorerFiles} 
+            onAddFiles={(newFiles) => {
+              setFiles(prev => {
+                const updated = [...prev];
+                newFiles.forEach(f => { if (!updated.some(x => x.path === f.path)) updated.push(f); });
+                return updated;
+              });
+            }}
+            onPreviewFile={(item) => setActivePreviewFile(item)}
             allowedExtensions={['.png', '.jpg', '.jpeg', '.webp', '.avif', '.heic', '.heif']}
-            maxListHeight={null}
-            onPreviewFile={setExplorerPreviewFile}
             theme={theme}
             defaultPath={localStorage.getItem('rfine_def_image_dir') || undefined}
-            storageKey="rfine_last_dir_watermark"
+            storageKey="rfine_last_dir_wm"
             openFolderPicker={openFolderPicker}
             onCollapse={toggleFileBrowser}
           />
         </CollapsibleFileBrowser>
 
-        {/* Processing Queue Title */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexShrink: 0 }}>
+        {/* Processing Queue Header with Grey Clear Queue Button & Uniform Spacing */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexShrink: 0, marginTop: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-white)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Processing Queue</span>
             <span style={{ fontSize: '10px', fontWeight: 'bold', background: 'rgba(77, 155, 34, 0.1)', color: 'var(--primary-color)', padding: '2px 8px', borderRadius: '12px' }}>
@@ -2519,529 +2366,264 @@ function WatermarkerStudio({ files, setFiles, setGlobalProgress, explorerPreview
             </span>
           </div>
           {files.length > 0 && (
-            <button 
-              onClick={() => { setFiles([]); setSuccessResult(null); }} 
-              style={{ background: 'none', border: 'none', color: '#EF4444', fontSize: '11px', cursor: 'pointer', fontWeight: 'bold' }}
-            >
+            <button className="btn-secondary" style={{ padding: '4px 8px', fontSize: '10.5px', color: 'var(--color-slate)', borderColor: 'transparent', background: 'transparent' }} onClick={() => { setFiles([]); setActivePreviewFile(null); setSuccessResult(null); }}>
               Clear Queue
             </button>
           )}
         </div>
 
+        {/* Success Banner (Square Folder Icon Only) */}
         {successResult && (
-          <div className="animate-fade-in" style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'space-between',
-            padding: '10px 14px', 
-            background: 'rgba(77, 155, 34, 0.08)', 
-            border: '1px solid rgba(77, 155, 34, 0.25)', 
-            borderRadius: '6px', 
-            fontSize: '11px', 
-            color: '#72BC28', 
-            fontWeight: 'bold',
-            marginBottom: '12px',
-            gap: '12px',
-            flexShrink: 0
-          }}>
+          <div className="animate-fade-in" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 14px', background: 'rgba(77, 155, 34, 0.08)', border: '1px solid rgba(77, 155, 34, 0.25)', borderRadius: '6px', fontSize: '11px', color: '#72BC28', fontWeight: 'bold', marginBottom: '12px', gap: '12px', flexShrink: 0 }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <CheckCircle size={14} color="#72BC28" />
               Watermark applied successfully!
             </span>
             {successResult.targetFolder && (
               <button 
-                onClick={async () => {
-                  try {
-                    await fetch(`${API_BASE}/open-folder`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ folderPath: successResult.targetFolder })
-                    });
-                  } catch (e) { console.error(e); }
-                }}
-                className="btn-secondary"
-                style={{ padding: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.05)', borderColor: 'var(--glass-border)', color: 'var(--primary-color)', borderRadius: '4px' }}
-                title="Open Saved Directory"
+                onClick={async () => { try { await fetch(`${API_BASE}/open-folder`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ folderPath: successResult.targetFolder }) }); } catch (e) {} }} 
+                style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.05)', border: '1px solid var(--glass-border)', borderRadius: '6px', cursor: 'pointer' }} 
+                title="Open Output Folder"
               >
-                <FolderOpen size={14} color="var(--primary-color)" />
+                <FolderOpen size={16} color="var(--primary-color)" />
               </button>
             )}
           </div>
         )}
 
-        {/* Selected Files List */}
+        {/* Queue List (JPG • 355 KB with NO size reduction pill) */}
         {files.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', border: '1px solid var(--glass-border)', borderRadius: '6px', overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.02)', marginBottom: '15px', flexShrink: 0 }}>
-            {files.map((file, idx) => (
-              <div 
-                key={idx} 
-                onClick={() => setActivePreviewFile(file)}
-                draggable
-                onDragStart={(e) => handleDragStart(e, idx)}
-                onDragOver={(e) => handleDragOver(e, idx)}
-                onDragLeave={handleDragLeave}
-                onDragEnd={handleDragEnd}
-                onDrop={(e) => handleDrop(e, idx)}
-                style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center', 
-                  padding: '8px 12px', 
-                  borderBottom: dragOverIndex === idx && draggedIndex !== null && draggedIndex < idx ? '2px solid var(--secondary-color)' : (idx === files.length - 1 ? 'none' : '1px solid var(--glass-border)'), 
-                  borderTop: dragOverIndex === idx && draggedIndex !== null && draggedIndex > idx ? '2px solid var(--secondary-color)' : 'none',
-                  backgroundColor: activePreviewFile === file ? 'rgba(77, 155, 34, 0.12)' : 'transparent',
-                  cursor: 'grab',
-                  fontSize: '12px' 
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flexGrow: 1 }}>
-                  <span style={{ cursor: 'grab', color: 'var(--color-slate)', fontSize: '12px' }}>⋮⋮</span>
-                  <div style={{ width: '36px', height: '36px', background: 'rgba(0,0,0,0.05)', border: '1px solid var(--glass-border)', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
-                    <img 
-                      src={`${API_BASE}/image-preview?path=${encodeURIComponent(file.path)}`} 
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                      alt=""
-                      onError={(e) => {
-                        e.target.style.display = 'none';
-                      }}
-                    />
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                    <span style={{ color: 'var(--color-white)', fontWeight: 'bold', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={file.path}>
-                      {file.name}
-                    </span>
-                    {(() => {
-                      const result = successResult?.results?.find(r => r.name === file.name);
-                      if (result && result.success) {
-                        const pct = Math.round((1 - result.optimizedSize / result.originalSize) * 100);
-                        return (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '10px', marginTop: '2px' }}>
-                            <span style={{ color: 'var(--color-slate)' }}>{formatFileSize(file.size)}</span>
-                            <span style={{ color: 'var(--color-slate)' }}>&rarr;</span>
-                            <span style={{ color: '#5ABF3A', fontWeight: 'bold' }}>{formatFileSize(result.optimizedSize)}</span>
-                            <span style={{ background: 'rgba(90, 191, 58, 0.15)', color: '#5ABF3A', padding: '1px 6px', borderRadius: '10px', fontWeight: 'bold', fontSize: '9px' }}>
-                              {pct > 0 ? `-${pct}%` : `0%`}
-                            </span>
-                          </div>
-                        );
-                      }
-                      return <span style={{ color: 'var(--color-slate)', fontSize: '10px' }}>{formatFileSize(file.size)}</span>;
-                    })()}
-                  </div>
-                </div>
-                <button 
-                  onClick={(e) => { e.stopPropagation(); handleRemoveFile(idx); }} 
-                  style={{ background: 'none', border: 'none', color: 'var(--primary-color)', cursor: 'pointer', display: 'flex', padding: '6px', borderRadius: '4px' }}
-                  title="Remove file"
+          <div style={{ display: 'flex', flexDirection: 'column', border: '1px solid var(--glass-border)', borderRadius: '8px', overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.02)', marginBottom: '12px', flexShrink: 0 }}>
+            {files.map((file, idx) => {
+              const fileName = typeof file === 'string' ? path.basename(file) : file.name;
+              const filePath = typeof file === 'string' ? file : file.path;
+              const fileSize = typeof file === 'string' ? 0 : file.size;
+              const ext = (path.extname(fileName) || '').toUpperCase().replace('.', '');
+              const isDragTarget = dragOverIndex === idx;
+              return (
+                <div 
+                  key={idx} 
+                  draggable 
+                  onDragStart={(e) => handleDragStart(e, idx)} 
+                  onDragOver={(e) => handleDragOver(e, idx)} 
+                  onDragLeave={handleDragLeave} 
+                  onDragEnd={handleDragEnd} 
+                  onDrop={(e) => handleDrop(e, idx)} 
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'space-between', 
+                    padding: '10px 14px', 
+                    borderBottom: idx === files.length - 1 ? 'none' : '1px solid var(--glass-border)', 
+                    borderTop: isDragTarget ? '3px solid var(--primary-color)' : 'none',
+                    background: isDragTarget ? 'rgba(77, 155, 34, 0.15)' : 'transparent', 
+                    opacity: draggedIndex === idx ? 0.5 : 1, 
+                    transition: 'all 0.15s ease', 
+                    cursor: 'grab' 
+                  }} 
+                  onClick={() => setActivePreviewFile(file)}
                 >
-                  <Trash2 size={14} color="var(--primary-color)" />
-                </button>
-              </div>
-            ))}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flexGrow: 1 }}>
+                    <span style={{ cursor: 'grab', color: 'var(--color-slate)', fontSize: '13px', userSelect: 'none' }}>⋮⋮</span>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '4px', overflow: 'hidden', backgroundColor: 'rgba(0,0,0,0.2)', border: '1px solid var(--glass-border)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <img src={`${API_BASE}/image-preview?path=${encodeURIComponent(filePath)}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }} />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                      <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-white)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{fileName}</span>
+                      <span style={{ fontSize: '10px', color: 'var(--color-slate)' }}>{ext} • {formatFileSize(fileSize)}</span>
+                    </div>
+                  </div>
+                  <button style={{ background: 'none', border: 'none', color: 'var(--primary-color)', cursor: 'pointer', padding: '4px' }} onClick={(e) => { e.stopPropagation(); handleRemoveFile(idx); }} title="Remove item">
+                    <Trash2 size={15} color="var(--primary-color)" />
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
 
-        <div 
-          className="dropzone flex-center" 
-          onClick={() => document.getElementById('watermark-studio-add-file-input').click()}
-          style={{ 
-            padding: '20px', 
-            position: 'relative',
-            overflow: 'hidden'
-          }}
-        >
-          <input 
-            type="file"
-            id="watermark-studio-add-file-input"
-            multiple
-            accept=".jpg,.jpeg,.png,.webp,.avif,.heic"
-            onChange={(e) => {
-              if (e.target.files) {
-                const newFiles = Array.from(e.target.files).map(file => ({
-                  name: file.name,
-                  path: file.path || file.name,
-                  size: file.size,
-                  type: file.type
-                }));
-                setFiles(prev => {
-                  const existingPaths = new Set(prev.map(f => f.path));
-                  const uniqueNew = newFiles.filter(f => !existingPaths.has(f.path));
-                  return [...prev, ...uniqueNew];
-                });
-              }
-            }}
-            style={{ display: 'none' }}
-          />
-          {isDraggingFile ? (
-            <>
-              <Download size={20} color="var(--primary-color)" className="animate-bounce" style={{ color: 'var(--primary-color)' }} />
-              <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--primary-color)' }}>Drop files here to start refining</span>
-            </>
-          ) : (
-            <>
-              <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-white)' }}>+ Add files or drag & drop</span>
-              <span style={{ fontSize: '10px', color: 'var(--color-slate)' }}>Supports JPEG, PNG, WEBP, AVIF, HEIC</span>
-            </>
-          )}
+        {/* Unified Dropzone at bottom */}
+        <div className="dropzone flex-center" onClick={() => document.getElementById('wm-studio-add-file-input').click()} style={{ padding: '20px', position: 'relative', marginTop: 'auto', flexShrink: 0 }}>
+          <input type="file" id="wm-studio-add-file-input" multiple accept=".jpg,.jpeg,.png,.webp,.avif,.heic" onChange={(e) => { if (e.target.files) { const newFiles = Array.from(e.target.files).map(file => ({ name: file.name, path: file.path || file.name, size: file.size })); setFiles(prev => [...prev, ...newFiles.filter(f => !prev.some(x => x.path === f.path))]); } }} style={{ display: 'none' }} />
+          <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-white)' }}>+ Add more files or drag & drop</span>
+          <span style={{ fontSize: '10px', color: 'var(--color-slate)' }}>Supports JPEG, PNG, WEBP, AVIF, HEIC</span>
         </div>
       </div>
 
-      {/* Right Sidebar: Refinement Settings */}
+      {/* Right Sidebar: Watermark Settings & Preview Card with Fullscreen Button */}
       <div className="right-sidebar">
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '0 0 4px 0' }}>
           <Layers size={20} color="var(--primary-color)" />
-          <h2 style={{ fontSize: '18px', fontWeight: '800', color: 'var(--primary-color)', margin: 0, textTransform: 'uppercase' }}>Watermarker</h2>
+          <h2 style={{ fontSize: '18px', fontWeight: '800', color: 'var(--primary-color)', margin: 0 }}>WATERMARKER</h2>
         </div>
-        <p style={{ color: 'var(--color-slate)', fontSize: '11px', margin: '0 0 24px 0', lineHeight: '1.4' }}>Batch watermark images.</p>
+        <p style={{ color: 'var(--color-slate)', fontSize: '11px', margin: '0 0 16px 0' }}>Batch watermark images.</p>
 
-        {/* Inner Scrollable Settings Container */}
-        <div className="sidebar-settings-content">
-          {/* Active Preview Frame with watermark overlay */}
-          {activePreviewFile && (
-            <div className="animate-fade-in" style={{ padding: '10px', background: 'rgba(0,0,0,0.05)', borderRadius: '6px', marginBottom: '15px', border: '1px solid var(--glass-border)', textAlign: 'center', position: 'relative' }}>
-              {onOpenFullscreenPreview && (
-                <button
-                  onClick={() => onOpenFullscreenPreview(activePreviewFile)}
-                  className="btn-secondary"
-                  style={{ position: 'absolute', top: '6px', right: '6px', padding: '4px', borderRadius: '4px', background: 'rgba(0,0,0,0.5)', border: 'none', cursor: 'pointer', zIndex: 10 }}
-                  title="Open Fullscreen Preview"
-                >
-                  <Maximize2 size={12} color="#FFFFFF" />
-                </button>
-              )}
+        {/* Preview Card with Expand Button */}
+        {currentSelectedFile && (() => {
+          const fn = typeof currentSelectedFile === 'string' ? path.basename(currentSelectedFile) : currentSelectedFile.name;
+          const fp = typeof currentSelectedFile === 'string' ? currentSelectedFile : currentSelectedFile.path;
+          return (
+            <div className="glass-panel" style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--glass-border)', marginBottom: '16px', position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.15)' }}>
+              <button 
+                onClick={() => setIsFullscreenAdjusterOpen(true)} 
+                className="btn-secondary" 
+                style={{ position: 'absolute', top: '8px', right: '8px', padding: '4px 6px', borderRadius: '4px', background: 'rgba(0,0,0,0.5)', border: '1px solid var(--glass-border)', color: '#FFF', cursor: 'pointer', zIndex: 5 }} 
+                title="Interactive Fullscreen Adjuster"
+              >
+                <Maximize2 size={12} />
+              </button>
               <div 
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUpOrLeave}
-                onMouseLeave={handleMouseUpOrLeave}
-                style={{
-                  position: 'relative',
-                  display: 'inline-block',
-                  maxWidth: '100%',
-                  maxHeight: '160px',
-                  borderRadius: '4px',
-                  overflow: 'hidden',
-                  userSelect: 'none',
-                  background: 'rgba(0, 0, 0, 0.2)'
-                }}
+                onMouseDown={() => setIsDragging(true)}
+                onMouseUp={() => setIsDragging(false)}
+                onMouseLeave={() => setIsDragging(false)}
+                onMouseMove={handleCanvasMouseMove}
+                style={{ width: '100%', height: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderRadius: '6px', backgroundColor: 'rgba(0,0,0,0.3)', position: 'relative', cursor: isDragging ? 'grabbing' : 'grab' }}
               >
                 <img 
-                  src={`${API_BASE}/image-preview?path=${encodeURIComponent(activePreviewFile.path)}`}
-                  style={{ display: 'block', maxWidth: '100%', maxHeight: '160px', borderRadius: '4px', objectFit: 'contain', pointerEvents: 'none' }}
-                  alt="Selected preview"
+                  src={`${API_BASE}/image-preview?path=${encodeURIComponent(fp)}`} 
+                  alt="" 
+                  style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }} 
+                  onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }}
                 />
-                {watermarkType === 'image' && watermark && (
-                  <img 
-                    src={watermark}
-                    onMouseDown={handleMouseDown}
-                    style={{
-                      position: 'absolute',
-                      left: `${watermarkX}%`,
-                      top: `${watermarkY}%`,
-                      width: `${watermarkSize}%`,
-                      opacity: watermarkOpacity,
-                      cursor: 'move',
-                      userSelect: 'none',
-                      pointerEvents: 'auto',
-                      border: '1px dashed rgba(255,255,255,0.4)',
-                      transition: isDragging ? 'none' : 'all 0.1s ease'
-                    }}
-                    alt="Watermark overlay"
-                  />
-                )}
                 {watermarkType === 'text' && watermarkText && (
-                  <div
-                    onMouseDown={handleMouseDown}
-                    style={{
-                      position: 'absolute',
-                      left: `${watermarkX}%`,
-                      top: `${watermarkY}%`,
-                      fontSize: `${Math.round(14 * (watermarkSize / 15))}px`,
-                      color: '#ffffff',
-                      opacity: watermarkOpacity,
-                      cursor: 'move',
-                      userSelect: 'none',
-                      pointerEvents: 'auto',
-                      border: '1px dashed rgba(255,255,255,0.4)',
-                      padding: '2px 4px',
-                      fontWeight: 'bold',
-                      fontFamily: 'sans-serif',
-                      whiteSpace: 'nowrap',
-                      textShadow: '1px 1px 2px rgba(0,0,0,0.6)',
-                      transition: isDragging ? 'none' : 'all 0.1s ease'
-                    }}
-                  >
+                  <div style={{ position: 'absolute', left: `${watermarkX}%`, top: `${watermarkY}%`, color: '#FFFFFF', opacity: watermarkOpacity, fontSize: `${watermarkSize * 0.8}px`, fontWeight: 'bold', textShadow: '0 2px 4px rgba(0,0,0,0.8)', pointerEvents: 'none', userSelect: 'none', whiteSpace: 'nowrap' }}>
                     {watermarkText}
                   </div>
                 )}
+                {watermarkType === 'image' && watermark && (
+                  <img src={watermark} alt="wm" style={{ position: 'absolute', left: `${watermarkX}%`, top: `${watermarkY}%`, width: `${watermarkSize * 2}px`, opacity: watermarkOpacity, pointerEvents: 'none', userSelect: 'none' }} />
+                )}
               </div>
-              <span style={{ fontSize: '10px', color: 'var(--color-slate)', display: 'block', marginTop: '4px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                {activePreviewFile.name}
+              <span style={{ fontSize: '10.5px', color: 'var(--color-slate)', marginTop: '8px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '100%' }}>
+                {fn}
               </span>
             </div>
-          )}
+          );
+        })()}
 
-          {/* Category 1: Watermark Configuration */}
-          <div style={{ marginBottom: '12px' }}>
-            <div 
-              onClick={() => setSectionConfigExpanded(!sectionConfigExpanded)}
-              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '6px 0', borderBottom: '1px solid var(--glass-border)', marginBottom: '10px' }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Sliders size={13} color="var(--primary-color)" />
-                <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-white)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Configuration</span>
-              </div>
+        <div className="sidebar-settings-content">
+          {/* Section 1: Configuration */}
+          <div style={{ marginBottom: '16px' }}>
+            <div onClick={() => setSectionConfigExpanded(!sectionConfigExpanded)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '6px 0', borderBottom: '1px solid var(--glass-border)', marginBottom: '10px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-white)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Configuration</span>
               <span style={{ fontSize: '10px', color: 'var(--color-slate)' }}>{sectionConfigExpanded ? '▼' : '▶'}</span>
             </div>
 
             {sectionConfigExpanded && (
-              <div className="animate-fade-in" style={{ padding: '2px 0', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <div>
-                  <span className="form-label" style={{ fontSize: '10px' }}>Watermark Type</span>
-                  <div className="clean-preset-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
-                    <button
-                      type="button"
-                      onClick={() => setWatermarkType('image')}
-                      className={`clean-preset-btn ${watermarkType === 'image' ? 'active' : ''}`}
-                    >
-                      Image Logo
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setWatermarkType('text')}
-                      className={`clean-preset-btn ${watermarkType === 'text' ? 'active' : ''}`}
-                    >
-                      Text
-                    </button>
-                  </div>
+              <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <span className="form-label" style={{ fontSize: '10px' }}>Watermark Type</span>
+                <div className="clean-preset-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                  <button className={`clean-preset-btn ${watermarkType === 'image' ? 'active' : ''}`} onClick={() => setWatermarkType('image')}>Image Logo</button>
+                  <button className={`clean-preset-btn ${watermarkType === 'text' ? 'active' : ''}`} onClick={() => setWatermarkType('text')}>Text</button>
                 </div>
 
-                {watermarkType === 'image' && (
+                {watermarkType === 'text' ? (
                   <div>
-                    <span className="form-label" style={{ fontSize: '10px' }}>Watermark File (PNG/JPG)</span>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <input 
-                        type="file" 
-                        accept="image/png, image/jpeg, image/jpg"
-                        style={{ display: 'none' }}
-                        id="watermark-studio-file-input-sidebar"
-                        onChange={(e) => {
-                          const file = e.target.files[0];
-                          if (file) {
-                            setWatermarkFileName(file.name);
-                            const reader = new FileReader();
-                            reader.onload = (event) => {
-                              setWatermark(event.target.result);
-                            };
-                            reader.readAsDataURL(file);
-                          }
-                        }}
-                      />
-                      <button 
-                        type="button"
-                        onClick={() => document.getElementById('watermark-studio-file-input-sidebar').click()}
-                        className="btn-secondary"
-                        style={{ padding: '6px 12px', fontSize: '10.5px' }}
-                      >
-                        Choose...
-                      </button>
-                      <span style={{ fontSize: '9px', color: 'var(--color-slate)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', flexGrow: 1 }}>
-                        {watermarkFileName ? watermarkFileName : 'No file'}
-                      </span>
-                    </div>
+                    <span className="form-label" style={{ fontSize: '9px' }}>Text Content</span>
+                    <input type="text" className="form-input" value={watermarkText} onChange={(e) => setWatermarkText(e.target.value)} style={{ padding: '6px 10px', fontSize: '12px' }} />
                   </div>
-                )}
-
-                {watermarkType === 'text' && (
+                ) : (
                   <div>
-                    <span className="form-label" style={{ fontSize: '10px' }}>Watermark Text</span>
-                    <input 
-                      type="text" 
-                      value={watermarkText} 
-                      onChange={(e) => setWatermarkText(e.target.value)}
-                      placeholder="Enter watermark text..."
-                      className="form-input"
-                      style={{ padding: '6px 10px', fontSize: '12px' }}
-                    />
+                    <span className="form-label" style={{ fontSize: '9px' }}>Upload Logo Image</span>
+                    <input type="file" accept="image/*" onChange={handleWatermarkUpload} style={{ fontSize: '11px', color: 'var(--color-slate)' }} />
                   </div>
                 )}
 
-                {((watermarkType === 'image' && watermark) || watermarkType === 'text') && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
-                    <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                        <span className="form-label" style={{ fontSize: '10px', marginBottom: 0 }}>Opacity</span>
-                        <span style={{ background: 'rgba(77, 155, 34, 0.15)', color: 'var(--primary-color)', padding: '2px 8px', borderRadius: '4px', fontWeight: 'bold', fontSize: '10px' }}>
-                          {Math.round(watermarkOpacity * 100)}%
-                        </span>
-                      </div>
-                      <input 
-                        type="range" 
-                        min="10" 
-                        max="100" 
-                        value={Math.round(watermarkOpacity * 100)} 
-                        onChange={(e) => setWatermarkOpacity(parseFloat(e.target.value) / 100)} 
-                      />
-                    </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span className="form-label" style={{ fontSize: '9px' }}>Opacity</span>
+                  <span style={{ fontSize: '10px', fontWeight: 'bold', color: 'var(--color-white)' }}>{Math.round(watermarkOpacity * 100)}%</span>
+                </div>
+                <input type="range" min="0.05" max="1" step="0.05" value={watermarkOpacity} onChange={(e) => setWatermarkOpacity(parseFloat(e.target.value))} />
 
-                    <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                        <span className="form-label" style={{ fontSize: '10px', marginBottom: 0 }}>Size</span>
-                        <span style={{ background: 'rgba(77, 155, 34, 0.15)', color: 'var(--primary-color)', padding: '2px 8px', borderRadius: '4px', fontWeight: 'bold', fontSize: '10px' }}>
-                          {watermarkSize}%
-                        </span>
-                      </div>
-                      <input 
-                        type="range" 
-                        min="5" 
-                        max="50" 
-                        value={watermarkSize} 
-                        onChange={(e) => handleSizeChange(parseInt(e.target.value))} 
-                      />
-                    </div>
-
-                    <div>
-                      <span className="form-label" style={{ fontSize: '9px', marginBottom: '4px' }}>Presets</span>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '4px' }}>
-                        {[
-                          { value: 'top-left', label: 'T-L' },
-                          { value: 'top-right', label: 'T-R' },
-                          { value: 'center', label: 'Mid' },
-                          { value: 'bottom-left', label: 'B-L' },
-                          { value: 'bottom-right', label: 'B-R' }
-                        ].map((pos) => (
-                          <button
-                            key={pos.value}
-                            type="button"
-                            onClick={() => setPlacementPreset(pos.value)}
-                            className="btn-secondary"
-                            style={{
-                              padding: '4px 0',
-                              fontSize: '9px',
-                              justifyContent: 'center',
-                              background: watermarkPosition === pos.value ? 'rgba(77, 155, 34, 0.15)' : 'transparent',
-                              borderColor: watermarkPosition === pos.value ? 'var(--primary-color)' : 'var(--glass-border)',
-                              fontWeight: watermarkPosition === pos.value ? 'bold' : 'normal'
-                            }}
-                          >
-                            {pos.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span className="form-label" style={{ fontSize: '9px' }}>Size</span>
+                  <span style={{ fontSize: '10px', fontWeight: 'bold', color: 'var(--color-white)' }}>{watermarkSize}%</span>
+                </div>
+                <input type="range" min="5" max="50" value={watermarkSize} onChange={(e) => setWatermarkSize(parseInt(e.target.value))} />
               </div>
             )}
           </div>
 
-          {/* Category 2: Save Destination */}
-          <div style={{ marginBottom: '20px' }}>
-            <div 
-              onClick={() => setSectionSaveExpanded(!sectionSaveExpanded)}
-              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '6px 0', borderBottom: '1px solid var(--glass-border)', marginBottom: '10px' }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <FolderOpen size={13} color="var(--primary-color)" />
-                <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-white)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Save Destination</span>
-              </div>
+          {/* Section 2: Save Destination */}
+          <div style={{ marginBottom: '16px' }}>
+            <div onClick={() => setSectionSaveExpanded(!sectionSaveExpanded)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '6px 0', borderBottom: '1px solid var(--glass-border)', marginBottom: '10px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-white)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Save Destination</span>
               <span style={{ fontSize: '10px', color: 'var(--color-slate)' }}>{sectionSaveExpanded ? '▼' : '▶'}</span>
             </div>
 
             {sectionSaveExpanded && (
-              <div className="animate-fade-in" style={{ padding: '2px 0' }}>
-                <span className="form-label" style={{ fontSize: '10px' }}>Target Directory</span>
+              <div className="animate-fade-in">
                 <div className="clean-preset-grid" style={{ gridTemplateColumns: '1fr 1fr 1.2fr' }}>
-                  <button
-                    className={`clean-preset-btn ${saveDestMode === 'original' ? 'active' : ''}`}
-                    onClick={() => setSaveDestMode('original')}
-                    style={{ padding: '6px 4px', fontSize: '9.5px' }}
-                  >
-                    Original
-                  </button>
-                  <button
-                    className={`clean-preset-btn ${saveDestMode === 'default' ? 'active' : ''}`}
-                    onClick={() => setSaveDestMode('default')}
-                    style={{ padding: '6px 4px', fontSize: '9.5px' }}
-                  >
-                    Default
-                  </button>
-                  <button
-                    className={`clean-preset-btn ${saveDestMode === 'custom' ? 'active' : ''}`}
-                    onClick={handleBrowseDestFolder}
-                    style={{ padding: '6px 4px', fontSize: '9.5px' }}
-                  >
-                    Custom...
-                  </button>
+                  <button className={`clean-preset-btn ${saveDestMode === 'original' ? 'active' : ''}`} onClick={() => setSaveDestMode('original')} style={{ padding: '6px 4px', fontSize: '9.5px' }}>Original</button>
+                  <button className={`clean-preset-btn ${saveDestMode === 'default' ? 'active' : ''}`} onClick={() => setSaveDestMode('default')} style={{ padding: '6px 4px', fontSize: '9.5px' }}>Default</button>
+                  <button className={`clean-preset-btn ${saveDestMode === 'custom' ? 'active' : ''}`} onClick={() => { setSaveDestMode('custom'); handleBrowseDestFolder(); }} style={{ padding: '6px 4px', fontSize: '9.5px' }}>Custom...</button>
                 </div>
-                <span style={{ fontSize: '9px', color: 'var(--color-slate)', fontStyle: 'italic', display: 'block', marginTop: '4px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={
-                  saveDestMode === 'original' ? 'Original file directory' :
-                  saveDestMode === 'default' ? (localStorage.getItem('rfine_def_save_dir') || 'Default folder not set') :
-                  customDestPath || 'No folder selected'
-                }>
-                  Saving to: {
-                    saveDestMode === 'original' ? 'Original Folder' :
-                    saveDestMode === 'default' ? (localStorage.getItem('rfine_def_save_dir') || 'Default not set') :
-                    customDestPath ? path.basename(customDestPath) : 'Not configured'
-                  }
-                </span>
-
-                <div style={{ marginTop: '10px' }}>
-                  <span className="form-label" style={{ fontSize: '10px' }}>Save Action</span>
-                  <div className="clean-preset-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
-                    <button
-                      type="button"
-                      className={`clean-preset-btn ${saveCopyMode === 'copy' ? 'active' : ''}`}
-                      onClick={() => setSaveCopyMode('copy')}
-                      style={{ padding: '6px 4px', fontSize: '9.5px' }}
-                    >
-                      Add as Copy
-                    </button>
-                    <button
-                      type="button"
-                      className={`clean-preset-btn ${saveCopyMode === 'replace' ? 'active' : ''}`}
-                      onClick={() => setSaveCopyMode('replace')}
-                      style={{ padding: '6px 4px', fontSize: '9.5px' }}
-                    >
-                      Replace Original
-                    </button>
+                {saveDestMode === 'custom' && customDestPath && (
+                  <div style={{ fontSize: '10px', color: 'var(--primary-color)', marginTop: '6px', wordBreak: 'break-all' }}>
+                    Path: {customDestPath}
                   </div>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
-                  <input 
-                    type="checkbox" 
-                    id="chk-wm-open-folder"
-                    checked={openOnComplete}
-                    onChange={(e) => setOpenOnComplete(e.target.checked)}
-                  />
-                  <label htmlFor="chk-wm-open-folder" style={{ fontSize: '11px', color: 'var(--color-white)', cursor: 'pointer' }}>
-                    Auto-Open Output Directory
-                  </label>
+                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px' }}>
+                  <input type="checkbox" id="chk-wm-open-folder" checked={openOnComplete} onChange={(e) => setOpenOnComplete(e.target.checked)} />
+                  <label htmlFor="chk-wm-open-folder" style={{ fontSize: '11px', color: 'var(--color-white)', cursor: 'pointer' }}>Auto-Open Output Directory</label>
                 </div>
               </div>
             )}
           </div>
         </div>
 
-        {/* Sticky Pinned Button Container */}
         <div style={{ paddingTop: '15px', borderTop: '1px solid var(--glass-border)', flexShrink: 0 }}>
-          <button 
-            className="process-action-btn flex-center"
-            onClick={handleApplyWatermark}
-            disabled={files.length === 0 || !watermark || processing}
-            style={{ width: '100%', color: '#FFFFFF', justifyContent: 'center', gap: '6px' }}
-          >
+          <button className="process-action-btn flex-center" onClick={handleApplyWatermark} disabled={processing || files.length === 0} style={{ width: '100%', color: '#FFFFFF', justifyContent: 'center', gap: '6px' }}>
             <Zap size={14} color="#FFFFFF" fill="#FFFFFF" />
-            <span style={{ color: '#FFFFFF' }}>{processing ? 'PROCESSING...' : 'PROCESS SELECTED'}</span>
+            <span style={{ color: '#FFFFFF' }}>{processing ? 'PROCESSING...' : 'APPLY WATERMARK'}</span>
           </button>
         </div>
       </div>
+
+      {/* Fullscreen Watermark Adjuster Modal */}
+      {isFullscreenAdjusterOpen && currentSelectedFile && (() => {
+        const fp = typeof currentSelectedFile === 'string' ? currentSelectedFile : currentSelectedFile.path;
+        return (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)', zIndex: 999999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '30px' }} onClick={() => setIsFullscreenAdjusterOpen(false)}>
+            <div className="glass-card animate-scale-up" onClick={(e) => e.stopPropagation()} style={{ width: '90vw', height: '85vh', padding: '20px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '12px', background: 'var(--glass-bg)', border: '1px solid var(--glass-border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--glass-border)', paddingBottom: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Layers size={16} color="var(--primary-color)" />
+                  <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--color-white)' }}>Drag Watermark to Adjust Placement</span>
+                </div>
+                <button onClick={() => setIsFullscreenAdjusterOpen(false)} className="btn-primary" style={{ padding: '6px 14px', fontSize: '11px' }}>Apply & Close</button>
+              </div>
+
+              <div 
+                onMouseDown={() => setIsDragging(true)}
+                onMouseUp={() => setIsDragging(false)}
+                onMouseLeave={() => setIsDragging(false)}
+                onMouseMove={handleCanvasMouseMove}
+                style={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderRadius: '8px', backgroundColor: 'rgba(0,0,0,0.4)', position: 'relative', cursor: isDragging ? 'grabbing' : 'grab' }}
+              >
+                <img 
+                  src={`${API_BASE}/image-preview?path=${encodeURIComponent(fp)}`} 
+                  alt="" 
+                  style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }} 
+                />
+                {watermarkType === 'text' && watermarkText && (
+                  <div style={{ position: 'absolute', left: `${watermarkX}%`, top: `${watermarkY}%`, color: '#FFFFFF', opacity: watermarkOpacity, fontSize: `${watermarkSize * 1.5}px`, fontWeight: 'bold', textShadow: '0 2px 4px rgba(0,0,0,0.8)', pointerEvents: 'none', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                    {watermarkText}
+                  </div>
+                )}
+                {watermarkType === 'image' && watermark && (
+                  <img src={watermark} alt="wm" style={{ position: 'absolute', left: `${watermarkX}%`, top: `${watermarkY}%`, width: `${watermarkSize * 4}px`, opacity: watermarkOpacity, pointerEvents: 'none', userSelect: 'none' }} />
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
 
-// ----------------------------------------------------------------------------
-// VIDEO COMPRESSOR MODULE
+
 // ----------------------------------------------------------------------------
 function VideoCompressor({ files, setFiles, setGlobalProgress, theme, openFolderPicker, isDraggingFile, explorerHeight, setExplorerHeight, addRecentProcess, isFileBrowserCollapsed, toggleFileBrowser }) {
   const [format, setFormat] = useState(() => localStorage.getItem('rfine_vid_format') || 'mp4');
