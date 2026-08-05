@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Image, 
@@ -51,12 +52,11 @@ import {
   Minimize2,
   ChevronUp,
   ChevronDown,
-  Crop
+  Crop,
+  Home
 } from 'lucide-react';
 
-const API_BASE = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')
-  ? `${window.location.origin}/api`
-  : 'http://localhost:5001/api';
+const API_BASE = 'http://localhost:5001/api';
 
 // Reusable Collapsed File Browser Bar Component
 // Collapsible File Browser Component with animations
@@ -328,196 +328,25 @@ function ToolCard({ title, desc, icon: Icon, onClick, color = 'var(--primary-col
 }
 
 // IMAGE CROPPER MODULE
-function ImageCropper({ files, onFilesChange, toggleFileBrowser, isFileBrowserCollapsed, explorerHeight, handleDividerMouseDown, theme }) {
+function ImageCropper({ files, onFilesChange, toggleFileBrowser, isFileBrowserCollapsed, explorerHeight, handleDividerMouseDown, theme, openFolderPicker }) {
   const [selectedFile, setSelectedFile] = useState(null);
-  const [mode, setMode] = useState('crop'); // 'crop' or 'perspective'
-  
+  const [mode, setMode] = useState('crop');
   const [isCroppedPreview, setIsCroppedPreview] = useState(false);
-
-  useEffect(() => {
-    setIsCroppedPreview(false);
-    setSuccessResult(null);
-  }, [selectedFile]);
-
-  // Crop state
   const [lockAspectRatio, setLockAspectRatio] = useState(false);
-  const [cropBox, setCropBox] = useState({ x: 10, y: 10, width: 80, height: 80 }); // Percentages
-  
-  // Perspective state
-  const [corners, setCorners] = useState([
-    { x: 10, y: 10 }, { x: 90, y: 10 },
-    { x: 90, y: 90 }, { x: 10, y: 90 }
-  ]); // Percentages
-
-  // Padding state
-  const [padding, setPadding] = useState({ top: 0, right: 0, bottom: 0, left: 0 }); // px
-  const [fillMode, setFillMode] = useState('solid'); // 'solid', 'blur', 'mirror'
-  const [fillColor, setFillColor] = useState('#ffffff');
-  
-  // Adjustments
+  const [cropBox, setCropBox] = useState({ x: 10, y: 10, width: 80, height: 80 });
   const [rotation, setRotation] = useState(0);
-  const [tiltX, setTiltX] = useState(0);
-  const [tiltY, setTiltY] = useState(0);
   const [aspectRatio, setAspectRatio] = useState('free');
-  
-  // Dragging state
-  const [isDragging, setIsDragging] = useState(null); // 'tl', 'tr', 'bl', 'br', 'move', or index (0,1,2,3)
-  const dragStartRef = useRef({ startX: 0, startY: 0, box: null, corners: null });
-
-  // Output options
   const [outputFormat, setOutputFormat] = useState('jpg');
   const [targetFolder, setTargetFolder] = useState('');
+  const [saveDestMode, setSaveDestMode] = useState('original');
+  const [openOnComplete, setOpenOnComplete] = useState(true);
 
-  // Accordion categories expansion
-  const [sectionModeExpanded, setSectionModeExpanded] = useState(true);
-  const [sectionAspectExpanded, setSectionAspectExpanded] = useState(true);
-  const [sectionAdjustExpanded, setSectionAdjustExpanded] = useState(true);
-  const [sectionExtendExpanded, setSectionExtendExpanded] = useState(true);
-  const [sectionFormatExpanded, setSectionFormatExpanded] = useState(true);
-  
-  const canvasRef = useRef(null);
-  const imageRef = useRef(null);
   const containerRef = useRef(null);
-
+  const imageRef = useRef(null);
   const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
   const [inputWidth, setInputWidth] = useState('');
   const [inputHeight, setInputHeight] = useState('');
-
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (selectedFile) {
-        if (e.key === 'Enter' && document.activeElement.tagName !== 'INPUT') {
-          setIsCroppedPreview(true);
-        } else if (e.key === 'Escape') {
-          setIsCroppedPreview(false);
-        }
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedFile]);
-
-  const getRatioFactor = (ratio) => {
-    if (ratio === '1:1') return 1;
-    if (ratio === '16:9') return 16 / 9;
-    if (ratio === '4:3') return 4 / 3;
-    if (ratio === '3:2') return 3 / 2;
-    if (ratio === '9:16') return 9 / 16;
-    if (ratio === '3:4') return 3 / 4;
-    if (ratio === '2:3') return 2 / 3;
-    return null;
-  };
-
-  const handleAspectRatioChange = (ratio) => {
-    setAspectRatio(ratio);
-    if (ratio === 'free') return;
-    
-    const factor = getRatioFactor(ratio);
-    if (!factor || imageSize.width === 0) return;
-    
-    const currentW = (cropBox.width / 100) * imageSize.width;
-    let newH = currentW / factor;
-    let newHPercent = (newH / imageSize.height) * 100;
-    
-    if (cropBox.y + newHPercent > 100) {
-      newHPercent = 100 - cropBox.y;
-      newH = (newHPercent / 100) * imageSize.height;
-      const newW = newH * factor;
-      const newWPercent = (newW / imageSize.width) * 100;
-      setCropBox(prev => ({
-        ...prev,
-        width: Math.min(100 - prev.x, newWPercent),
-        height: newHPercent
-      }));
-    } else {
-      setCropBox(prev => ({
-        ...prev,
-        height: newHPercent
-      }));
-    }
-  };
-
-  const handlePixelWidthChange = (val) => {
-    setInputWidth(val);
-    const parsedVal = parseInt(val);
-    if (!parsedVal || imageSize.width === 0) return;
-    
-    const factor = getRatioFactor(aspectRatio) || (lockAspectRatio ? (cropBox.width * imageSize.width) / (cropBox.height * imageSize.height || 1) : null);
-    if (factor) {
-      const targetHPx = Math.round(parsedVal / factor);
-      setInputHeight(String(targetHPx));
-      
-      const newWPercent = (parsedVal / imageSize.width) * 100;
-      const newHPercent = (targetHPx / imageSize.height) * 100;
-      setCropBox(prev => ({
-        ...prev,
-        width: Math.min(100 - prev.x, newWPercent),
-        height: Math.min(100 - prev.y, newHPercent)
-      }));
-    } else {
-      const newWPercent = (parsedVal / imageSize.width) * 100;
-      setCropBox(prev => ({
-        ...prev,
-        width: Math.min(100 - prev.x, newWPercent)
-      }));
-    }
-  };
-
-  const handlePixelHeightChange = (val) => {
-    setInputHeight(val);
-    const parsedVal = parseInt(val);
-    if (!parsedVal || imageSize.height === 0) return;
-    
-    const factor = getRatioFactor(aspectRatio) || (lockAspectRatio ? (cropBox.width * imageSize.width) / (cropBox.height * imageSize.height || 1) : null);
-    if (factor) {
-      const targetWPx = Math.round(parsedVal * factor);
-      setInputWidth(String(targetWPx));
-      
-      const newWPercent = (targetWPx / imageSize.width) * 100;
-      const newHPercent = (parsedVal / imageSize.height) * 100;
-      setCropBox(prev => ({
-        ...prev,
-        width: Math.min(100 - prev.x, newWPercent),
-        height: Math.min(100 - prev.y, newHPercent)
-      }));
-    } else {
-      const newHPercent = (parsedVal / imageSize.height) * 100;
-      setCropBox(prev => ({
-        ...prev,
-        height: Math.min(100 - prev.y, newHPercent)
-      }));
-    }
-  };
-
-  const [successResult, setSuccessResult] = useState(null);
-  
-  const handleSaveCrop = async () => {
-    if (!selectedFile) return;
-    try {
-      const res = await fetch(`${API_BASE}/image/crop-local`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          localPath: selectedFile.path,
-          cropBox,
-          mode,
-          corners,
-          rotation,
-          tiltX,
-          tiltY,
-          fillMode,
-          fillColor,
-          outputFormat,
-          outputFolder: targetFolder || undefined
-        })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to save crop');
-      setSuccessResult({ targetFolder: data.targetFolder || targetFolder || '' });
-    } catch (e) {
-      alert('Crop failed: ' + e.message);
-    }
-  };
+  const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
     if (files.length > 0 && !selectedFile) {
@@ -525,332 +354,230 @@ function ImageCropper({ files, onFilesChange, toggleFileBrowser, isFileBrowserCo
     }
   }, [files]);
 
-  useEffect(() => {
-    if (selectedFile) {
-      const img = new window.Image();
-      img.src = `${API_BASE}/image-preview?path=${encodeURIComponent(selectedFile.path)}`;
-      img.onload = () => {
-        imageRef.current = img;
-        setImageSize({ width: img.width, height: img.height });
-        const initialW = Math.round((cropBox.width / 100) * img.width);
-        const initialH = Math.round((cropBox.height / 100) * img.height);
-        setInputWidth(String(initialW));
-        setInputHeight(String(initialH));
-        drawCanvas();
-      };
-    }
-  }, [selectedFile, rotation, tiltX, tiltY, padding, fillMode, fillColor, cropBox, corners, mode, isCroppedPreview]);
-
-  useEffect(() => {
-    if (imageSize.width > 0) {
-      const wPx = Math.round((cropBox.width / 100) * imageSize.width);
-      const hPx = Math.round((cropBox.height / 100) * imageSize.height);
-      setInputWidth(String(wPx));
-      setInputHeight(String(hPx));
-    }
-  }, [cropBox.width, cropBox.height, imageSize]);
-
-  const drawCanvas = () => {
-    if (!canvasRef.current || !imageRef.current || !containerRef.current) return;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    const img = imageRef.current;
-    
-    const containerWidth = containerRef.current.clientWidth;
-    const containerHeight = containerRef.current.clientHeight;
-    
-    if (isCroppedPreview) {
-      // Create offscreen canvas to draw full transformed image
-      const offscreen = document.createElement('canvas');
-      offscreen.width = img.width;
-      offscreen.height = img.height;
-      const oCtx = offscreen.getContext('2d');
-      
-      oCtx.save();
-      oCtx.translate(offscreen.width / 2, offscreen.height / 2);
-      oCtx.rotate((rotation * Math.PI) / 180);
-      oCtx.transform(1, Math.tan(tiltY * Math.PI/180), Math.tan(tiltX * Math.PI/180), 1, 0, 0);
-      oCtx.translate(-offscreen.width / 2, -offscreen.height / 2);
-      oCtx.drawImage(img, 0, 0, offscreen.width, offscreen.height);
-      oCtx.restore();
-
-      if (mode === 'crop') {
-        const cropScale = Math.min(
-          (containerWidth - 40) / (img.width * cropBox.width / 100), 
-          (containerHeight - 40) / (img.height * cropBox.height / 100)
-        );
-        canvas.width = (img.width * cropBox.width / 100) * cropScale;
-        canvas.height = (img.height * cropBox.height / 100) * cropScale;
-        
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(
-          offscreen,
-          (cropBox.x / 100) * offscreen.width,
-          (cropBox.y / 100) * offscreen.height,
-          (cropBox.width / 100) * offscreen.width,
-          (cropBox.height / 100) * offscreen.height,
-          0,
-          0,
-          canvas.width,
-          canvas.height
-        );
-      } else if (mode === 'perspective') {
-        // Perspective warped crop preview
-        let minX = 100, maxX = 0, minY = 100, maxY = 0;
-        corners.forEach(c => {
-          if (c.x < minX) minX = c.x;
-          if (c.x > maxX) maxX = c.x;
-          if (c.y < minY) minY = c.y;
-          if (c.y > maxY) maxY = c.y;
-        });
-        
-        const wPercent = maxX - minX;
-        const hPercent = maxY - minY;
-        
-        const cropScale = Math.min(
-          (containerWidth - 40) / (img.width * wPercent / 100), 
-          (containerHeight - 40) / (img.height * hPercent / 100)
-        );
-        
-        canvas.width = (img.width * wPercent / 100) * cropScale;
-        canvas.height = (img.height * hPercent / 100) * cropScale;
-        
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(
-          offscreen,
-          (minX / 100) * offscreen.width,
-          (minY / 100) * offscreen.height,
-          (wPercent / 100) * offscreen.width,
-          (hPercent / 100) * offscreen.height,
-          0,
-          0,
-          canvas.width,
-          canvas.height
-        );
-      }
-      return;
-    }
-
-    const scale = Math.min((containerWidth - 40) / img.width, (containerHeight - 40) / img.height);
-    canvas.width = img.width * scale;
-    canvas.height = img.height * scale;
-    
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    ctx.save();
-    ctx.translate(canvas.width / 2, canvas.height / 2);
-    ctx.rotate((rotation * Math.PI) / 180);
-    ctx.transform(1, Math.tan(tiltY * Math.PI/180), Math.tan(tiltX * Math.PI/180), 1, 0, 0);
-    ctx.translate(-canvas.width / 2, -canvas.height / 2);
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    ctx.restore();
-    
-    if (mode === 'crop') {
-      const cropX = (cropBox.x / 100) * canvas.width;
-      const cropY = (cropBox.y / 100) * canvas.height;
-      const cropW = (cropBox.width / 100) * canvas.width;
-      const cropH = (cropBox.height / 100) * canvas.height;
-      
-      // Draw dark semi-transparent overlay outside crop box
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
-      ctx.beginPath();
-      ctx.rect(0, 0, canvas.width, canvas.height);
-      ctx.rect(cropX, cropY, cropW, cropH);
-      ctx.fill('evenodd');
-      
-      // Draw crop box border
-      ctx.strokeStyle = 'var(--primary-color)';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(cropX, cropY, cropW, cropH);
-
-      ctx.fillStyle = 'var(--primary-color)';
-      const handleSize = 8;
-      ctx.fillRect(cropX - handleSize/2, cropY - handleSize/2, handleSize, handleSize);
-      ctx.fillRect(cropX + cropW - handleSize/2, cropY - handleSize/2, handleSize, handleSize);
-      ctx.fillRect(cropX - handleSize/2, cropY + cropH - handleSize/2, handleSize, handleSize);
-      ctx.fillRect(cropX + cropW - handleSize/2, cropY + cropH - handleSize/2, handleSize, handleSize);
-    } else if (mode === 'perspective') {
-      if (!isCroppedPreview) {
-        ctx.strokeStyle = 'var(--primary-color)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        corners.forEach((c, i) => {
-          const x = (c.x / 100) * canvas.width;
-          const y = (c.y / 100) * canvas.height;
-          if (i === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        });
-        ctx.closePath();
-        ctx.stroke();
-
-        ctx.fillStyle = 'var(--primary-color)';
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 1.5;
-        corners.forEach(c => {
-          const x = (c.x / 100) * canvas.width;
-          const y = (c.y / 100) * canvas.height;
-          ctx.beginPath();
-          ctx.arc(x, y, 6, 0, 2 * Math.PI);
-          ctx.fill();
-          ctx.stroke();
-        });
-      }
-    }
+  const handleAspectRatioChange = (ratio) => {
+    setAspectRatio(ratio);
+    if (ratio === '1:1') setCropBox(prev => ({ ...prev, width: 50, height: 50 }));
+    else if (ratio === '16:9') setCropBox(prev => ({ ...prev, width: 80, height: 45 }));
+    else if (ratio === '4:3') setCropBox(prev => ({ ...prev, width: 80, height: 60 }));
+    else if (ratio === '9:16') setCropBox(prev => ({ ...prev, width: 45, height: 80 }));
   };
 
-  const handleCanvasMouseDown = (e) => {
-    if (isCroppedPreview) return;
-    if (!canvasRef.current) return;
-    const rect = canvasRef.current.getBoundingClientRect();
-    const clickX = ((e.clientX - rect.left) / rect.width) * 100;
-    const clickY = ((e.clientY - rect.top) / rect.height) * 100;
-    
-    if (mode === 'crop') {
-      const threshold = 6; // percentage proximity
-      const tlDist = Math.hypot(clickX - cropBox.x, clickY - cropBox.y);
-      const trDist = Math.hypot(clickX - (cropBox.x + cropBox.width), clickY - cropBox.y);
-      const blDist = Math.hypot(clickX - cropBox.x, clickY - (cropBox.y + cropBox.height));
-      const brDist = Math.hypot(clickX - (cropBox.x + cropBox.width), clickY - (cropBox.y + cropBox.height));
-      
-      dragStartRef.current = { startX: clickX, startY: clickY, box: { ...cropBox } };
-      
-      if (tlDist < threshold) {
-        setIsDragging('tl');
-      } else if (trDist < threshold) {
-        setIsDragging('tr');
-      } else if (blDist < threshold) {
-        setIsDragging('bl');
-      } else if (brDist < threshold) {
-        setIsDragging('br');
-      } else if (
-        clickX > cropBox.x && clickX < cropBox.x + cropBox.width &&
-        clickY > cropBox.y && clickY < cropBox.y + cropBox.height
-      ) {
-        setIsDragging('move');
-      }
-    } else if (mode === 'perspective') {
-      const threshold = 6;
-      let draggedIdx = null;
-      for (let i = 0; i < corners.length; i++) {
-        const dist = Math.hypot(clickX - corners[i].x, clickY - corners[i].y);
-        if (dist < threshold) {
-          draggedIdx = i;
-          break;
-        }
-      }
-      if (draggedIdx !== null) {
-        dragStartRef.current = { startX: clickX, startY: clickY, corners: [...corners] };
-        setIsDragging(draggedIdx);
-      }
-    }
-  };
-
-  const handleCanvasMouseMove = (e) => {
-    if (isDragging === null || !canvasRef.current) return;
-    const rect = canvasRef.current.getBoundingClientRect();
-    const currentX = ((e.clientX - rect.left) / rect.width) * 100;
-    const currentY = ((e.clientY - rect.top) / rect.height) * 100;
-    
-    const dx = currentX - dragStartRef.current.startX;
-    const dy = currentY - dragStartRef.current.startY;
-    
-    if (mode === 'crop') {
-      const startBox = dragStartRef.current.box;
-      let newBox = { ...startBox };
-      
-      if (isDragging === 'move') {
-        newBox.x = Math.max(0, Math.min(100 - startBox.width, startBox.x + dx));
-        newBox.y = Math.max(0, Math.min(100 - startBox.height, startBox.y + dy));
-      } else if (isDragging === 'tl') {
-        const newX = Math.max(0, Math.min(startBox.x + startBox.width - 5, startBox.x + dx));
-        const newY = Math.max(0, Math.min(startBox.y + startBox.height - 5, startBox.y + dy));
-        newBox.width = startBox.x + startBox.width - newX;
-        newBox.height = startBox.y + startBox.height - newY;
-        newBox.x = newX;
-        newBox.y = newY;
-      } else if (isDragging === 'tr') {
-        newBox.width = Math.max(5, Math.min(100 - startBox.x, startBox.width + dx));
-        const newY = Math.max(0, Math.min(startBox.y + startBox.height - 5, startBox.y + dy));
-        newBox.height = startBox.y + startBox.height - newY;
-        newBox.y = newY;
-      } else if (isDragging === 'bl') {
-        const newX = Math.max(0, Math.min(startBox.x + startBox.width - 5, startBox.x + dx));
-        newBox.width = startBox.x + startBox.width - newX;
-        newBox.x = newX;
-        newBox.height = Math.max(5, Math.min(100 - startBox.y, startBox.height + dy));
-      } else if (isDragging === 'br') {
-        newBox.width = Math.max(5, Math.min(100 - startBox.x, startBox.width + dx));
-        newBox.height = Math.max(5, Math.min(100 - startBox.y, startBox.height + dy));
-      }
-      
-      if (lockAspectRatio) {
-        const factor = getRatioFactor(aspectRatio) || (startBox.width * imageSize.width) / (startBox.height * imageSize.height || 1);
-        if (isDragging === 'br' || isDragging === 'tr' || isDragging === 'bl' || isDragging === 'tl') {
-          // Adjust height to match width times factor
-          const widthPx = (newBox.width / 100) * imageSize.width;
-          const heightPx = widthPx / factor;
-          newBox.height = (heightPx / imageSize.height) * 100;
-          if (newBox.y + newBox.height > 100) {
-            newBox.height = 100 - newBox.y;
-            newBox.width = ((newBox.height * imageSize.height / 100) * factor / imageSize.width) * 100;
-          }
-        }
-      }
-      setCropBox(newBox);
-    } else if (mode === 'perspective') {
-      const startCorners = dragStartRef.current.corners;
-      const newCorners = [...startCorners];
-      newCorners[isDragging] = {
-        x: Math.max(0, Math.min(100, startCorners[isDragging].x + dx)),
-        y: Math.max(0, Math.min(100, startCorners[isDragging].y + dy))
-      };
-      setCorners(newCorners);
-    }
-  };
-
-  const handleCanvasMouseUp = () => {
-    setIsDragging(null);
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    if (!e.dataTransfer.files || e.dataTransfer.files.length === 0) return;
-    const droppedFiles = Array.from(e.dataTransfer.files);
-    const images = droppedFiles.filter(f => {
-      const ext = f.name.substring(f.name.lastIndexOf('.')).toLowerCase();
-      return ['.png', '.jpg', '.jpeg', '.webp', '.avif', '.heic', '.heif'].includes(ext);
-    }).map(f => ({
-      name: f.name,
-      path: f.path,
-      size: f.size,
-      ext: f.name.substring(f.name.lastIndexOf('.'))
-    }));
-    if (images.length > 0) {
-      onFilesChange(prev => {
-        const updated = [...prev];
-        images.forEach(img => {
-          if (!updated.some(x => x.path === img.path)) {
-            updated.push(img);
-          }
-        });
-        return updated;
+  const handleSaveCrop = async () => {
+    if (!selectedFile) return;
+    setProcessing(true);
+    try {
+      const targetDir = saveDestMode === 'original' ? undefined : saveDestMode === 'default' ? (localStorage.getItem('rfine_def_save_dir') || undefined) : targetFolder || undefined;
+      const res = await fetch(`${API_BASE}/image/crop-local`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          localPath: selectedFile.path,
+          cropBox, rotation, outputFormat,
+          outputFolder: targetDir
+        })
       });
-      setSelectedFile(images[0]);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to crop image');
+      let savedFolder = data.targetFolder || '';
+      alert('Image cropped successfully!');
+      if (openOnComplete && savedFolder) {
+        try {
+          await fetch(`${API_BASE}/open-folder`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ folderPath: savedFolder }) });
+        } catch (e) {}
+      }
+    } catch (e) {
+      alert('Crop failed: ' + e.message);
+    } finally {
+      setProcessing(false);
     }
   };
 
   return (
     <div style={{ display: 'flex', width: '100%', height: '100%', minWidth: 0, position: 'relative' }}>
-      <div 
-        className="middle-canvas" 
-        onDragOver={handleDragOver}
-        onDrop={handleDrop}
-        style={{ display: 'flex', flexDirection: 'column', height: '100%', minWidth: 0, overflow: 'hidden' }}
-      >
+      <div className="middle-canvas" style={{ display: 'flex', flexDirection: 'column', height: '100%', minWidth: 0, overflow: 'hidden' }}>
+        <CollapsibleFileBrowser isFileBrowserCollapsed={isFileBrowserCollapsed} toggleFileBrowser={toggleFileBrowser} explorerHeight={explorerHeight} handleDividerMouseDown={handleDividerMouseDown}>
+          <FileExplorer 
+            onAddFiles={(newFiles) => {
+              onFilesChange(prev => {
+                const updated = [...prev];
+                newFiles.forEach(f => { if (!updated.some(x => x.path === f.path)) updated.push(f); });
+                return updated;
+              });
+              if (newFiles.length > 0) setSelectedFile(newFiles[0]);
+            }}
+            allowedExtensions={['.png', '.jpg', '.jpeg', '.webp', '.avif', '.heic', '.heif']}
+            theme={theme}
+            defaultPath={localStorage.getItem('rfine_def_image_dir') || undefined}
+            storageKey="rfine_last_dir_image"
+            openFolderPicker={openFolderPicker}
+            onCollapse={toggleFileBrowser}
+            onPreviewFile={setSelectedFile}
+          />
+        </CollapsibleFileBrowser>
+
+        <div ref={containerRef} style={{ flexGrow: 1, position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--canvas-bg)', borderRadius: '12px', margin: '16px 0', border: '1px solid var(--glass-border)' }}>
+          {selectedFile ? (
+            <img 
+              ref={imageRef}
+              src={`${API_BASE}/image-preview?path=${encodeURIComponent(selectedFile.path)}`}
+              alt="Crop target"
+              style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', transform: `rotate(${rotation}deg)` }}
+              onLoad={(e) => setImageSize({ width: e.target.naturalWidth, height: e.target.naturalHeight })}
+            />
+          ) : (
+            <span style={{ fontSize: '12px', color: 'var(--color-slate)' }}>Select an image to crop</span>
+          )}
+        </div>
+      </div>
+
+      <div className="right-sidebar">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '0 0 4px 0' }}>
+          <Crop size={20} color="var(--primary-color)" />
+          <h2 style={{ fontSize: '18px', fontWeight: '800', color: 'var(--primary-color)', margin: 0 }}>IMAGE CROPPER</h2>
+        </div>
+        <p style={{ color: 'var(--color-slate)', fontSize: '11px', margin: '0 0 24px 0' }}>Crop, rotate, and adjust image dimensions.</p>
+
+        <div className="sidebar-settings-content">
+          <div style={{ marginBottom: '16px' }}>
+            <span className="form-label" style={{ fontSize: '10px' }}>Aspect Ratio Presets</span>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '4px' }}>
+              {['free', '1:1', '16:9', '4:3', '9:16'].map(ratio => (
+                <button key={ratio} className={`clean-preset-btn ${aspectRatio === ratio ? 'active' : ''}`} onClick={() => handleAspectRatioChange(ratio)} style={{ padding: '6px 0', fontSize: '9px' }}>{ratio.toUpperCase()}</button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '16px' }}>
+            <span className="form-label" style={{ fontSize: '10px' }}>Rotate Image</span>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button className="btn-secondary" style={{ flex: 1, padding: '8px', fontSize: '11px' }} onClick={() => setRotation(r => (r - 90) % 360)}>↺ 90° Left</button>
+              <button className="btn-secondary" style={{ flex: 1, padding: '8px', fontSize: '11px' }} onClick={() => setRotation(r => (r + 90) % 360)}>↻ 90° Right</button>
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '16px' }}>
+            <span className="form-label" style={{ fontSize: '10px' }}>Output Format</span>
+            <div className="clean-preset-grid">
+              {['jpg', 'png', 'webp', 'avif'].map(fmt => (
+                <button key={fmt} className={`clean-preset-btn ${outputFormat === fmt ? 'active' : ''}`} onClick={() => setOutputFormat(fmt)}>{fmt.toUpperCase()}</button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '16px' }}>
+            <span className="form-label" style={{ fontSize: '10px' }}>Target Directory</span>
+            <div className="clean-preset-grid" style={{ gridTemplateColumns: '1fr 1fr 1.2fr' }}>
+              <button className={`clean-preset-btn ${saveDestMode === 'original' ? 'active' : ''}`} onClick={() => setSaveDestMode('original')} style={{ padding: '6px 4px', fontSize: '9.5px' }}>Original</button>
+              <button className={`clean-preset-btn ${saveDestMode === 'default' ? 'active' : ''}`} onClick={() => setSaveDestMode('default')} style={{ padding: '6px 4px', fontSize: '9.5px' }}>Default</button>
+              <button className={`clean-preset-btn ${saveDestMode === 'custom' ? 'active' : ''}`} onClick={() => { if (openFolderPicker) openFolderPicker(targetFolder, (p) => { setTargetFolder(p); setSaveDestMode('custom'); }); }} style={{ padding: '6px 4px', fontSize: '9.5px' }}>Custom...</button>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px' }}>
+              <input type="checkbox" id="chk-crop-open" checked={openOnComplete} onChange={(e) => setOpenOnComplete(e.target.checked)} />
+              <label htmlFor="chk-crop-open" style={{ fontSize: '11px', color: 'var(--color-white)', cursor: 'pointer' }}>Auto-Open Output Directory</label>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ paddingTop: '15px', borderTop: '1px solid var(--glass-border)', flexShrink: 0 }}>
+          <button className="process-action-btn flex-center" onClick={handleSaveCrop} disabled={processing || !selectedFile} style={{ width: '100%', color: '#FFFFFF', justifyContent: 'center', gap: '6px' }}>
+            <Zap size={14} color="#FFFFFF" fill="#FFFFFF" />
+            <span style={{ color: '#FFFFFF' }}>{processing ? 'CROPPING...' : 'CROP IMAGE'}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// ----------------------------------------------------------------------------
+function FrameExtractor({ videoFile, setVideoFile, setGlobalProgress, theme, openFolderPicker, isDraggingFile, explorerHeight, handleDividerMouseDown, addRecentProcess, onOpenFullscreenPreview, isFileBrowserCollapsed, toggleFileBrowser }) {
+  const [videoSrc, setVideoSrc] = useState('');
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [gallery, setGallery] = useState([]);
+  const [activeStill, setActiveStill] = useState(null);
+  const videoRef = useRef(null);
+
+  const [saveDestMode, setSaveDestMode] = useState(() => localStorage.getItem('rfine_ext_save_dest_mode') || 'original');
+  const [customDestPath, setCustomDestPath] = useState(() => localStorage.getItem('rfine_ext_custom_dest_path') || '');
+  const [openOnComplete, setOpenOnComplete] = useState(() => {
+    const val = localStorage.getItem('rfine_ext_open_on_complete');
+    return val === null ? true : val === 'true';
+  });
+  const [sectionSaveExpanded, setSectionSaveExpanded] = useState(true);
+
+  useEffect(() => {
+    if (videoFile) {
+      const p = typeof videoFile === 'string' ? videoFile : (videoFile.path || videoFile.name);
+      setVideoSrc(`${API_BASE}/video-stream?path=${encodeURIComponent(p)}`);
+    } else {
+      setVideoSrc('');
+    }
+  }, [videoFile]);
+
+  const handleBrowseDestFolder = () => {
+    if (openFolderPicker) {
+      openFolderPicker(customDestPath, (selectedPath) => {
+        setCustomDestPath(selectedPath);
+        setSaveDestMode('custom');
+      });
+    }
+  };
+
+  const handleCaptureFrame = () => {
+    if (!videoRef.current) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = videoRef.current.videoWidth || 1920;
+    canvas.height = videoRef.current.videoHeight || 1080;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL('image/png');
+    const still = {
+      id: Date.now() + Math.random(),
+      dataUrl,
+      timestamp: secondsToTimestamp(currentTime),
+      selected: true
+    };
+    setGallery(prev => [still, ...prev]);
+    setActiveStill(still);
+  };
+
+  const handleSaveStillLocally = async (still) => {
+    try {
+      const p = typeof videoFile === 'string' ? videoFile : (videoFile.path || videoFile.name);
+      const targetDir = saveDestMode === 'original' ? path.dirname(p) :
+                        saveDestMode === 'default' ? (localStorage.getItem('rfine_def_save_dir') || path.dirname(p)) :
+                        customDestPath || path.dirname(p);
+      
+      const res = await fetch(`${API_BASE}/image/save-base64`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dataUrl: still.dataUrl,
+          folderPath: targetDir,
+          fileName: `frame_${still.timestamp.replace(/[:.]/g, '-')}.png`
+        })
+      });
+      if (res.ok && addRecentProcess) {
+        addRecentProcess('Frame Extractor', `frame_${still.timestamp}.png`, 0, null, targetDir);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleDownloadAll = async () => {
+    for (const still of gallery) {
+      await handleSaveStillLocally(still);
+    }
+  };
+
+  return (
+    <div className="workspace-layout">
+      {/* Middle Canvas: Video Scrubber & Capture */}
+      <div className="middle-canvas">
         <CollapsibleFileBrowser
           isFileBrowserCollapsed={isFileBrowserCollapsed}
           toggleFileBrowser={toggleFileBrowser}
@@ -858,521 +585,159 @@ function ImageCropper({ files, onFilesChange, toggleFileBrowser, isFileBrowserCo
           handleDividerMouseDown={handleDividerMouseDown}
         >
           <FileExplorer 
-                onAddFiles={(newFiles) => {
-                  onFilesChange(prev => {
-                    const updated = [...prev];
-                    newFiles.forEach(f => {
-                      if (!updated.some(x => x.path === f.path)) {
-                        updated.push(f);
-                      }
-                    });
-                    return updated;
-                  });
-                  if (newFiles.length > 0) setSelectedFile(newFiles[0]);
-                }}
-                allowedExtensions={['.png', '.jpg', '.jpeg', '.webp', '.avif', '.heic', '.heif']}
-                theme={theme}
-                defaultPath={localStorage.getItem('rfine_def_image_dir') || undefined}
-                storageKey="rfine_last_dir_image"
-                onCollapse={toggleFileBrowser}
-                onPreviewFile={setSelectedFile}
-              />
+            onAddFiles={(f) => {
+              if (f && f[0]) setVideoFile(f[0]);
+            }} 
+            allowedExtensions={['.mp4', '.webm', '.mkv', '.mov']} 
+            maxListHeight={null} 
+            onPreviewFile={(f) => setVideoFile(f)}
+            theme={theme}
+            defaultPath={localStorage.getItem('rfine_def_video_dir') || undefined}
+            storageKey="rfine_last_dir_video"
+            openFolderPicker={openFolderPicker}
+            onCollapse={toggleFileBrowser}
+          />
         </CollapsibleFileBrowser>
- 
-        {successResult && (
-          <div className="animate-fade-in" style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'space-between',
-            padding: '10px 14px', 
-            background: 'rgba(77, 155, 34, 0.08)', 
-            border: '1px solid rgba(77, 155, 34, 0.25)', 
-            borderRadius: '6px', 
-            fontSize: '11px', 
-            color: 'var(--primary-color)', 
-            fontWeight: 'bold',
-            marginBottom: '12px',
-            gap: '12px',
-            flexShrink: 0
-          }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <CheckCircle size={14} color="var(--primary-color)" />
-              Successfully saved crop output!
-            </span>
-            {successResult.targetFolder && (
-              <button 
-                onClick={async () => {
-                  try {
-                    await fetch(`${API_BASE}/open-folder`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ folderPath: successResult.targetFolder })
-                    });
-                  } catch (e) { console.error(e); }
+
+        {videoSrc ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', flexGrow: 1, marginTop: '12px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', padding: '16px', background: 'transparent', alignItems: 'center', justifyContent: 'center', flexGrow: 1 }}>
+              <video 
+                ref={videoRef}
+                src={videoSrc}
+                crossOrigin="anonymous"
+                onPlay={() => setIsPlaying(true)}
+                onPause={() => setIsPlaying(false)}
+                onLoadedMetadata={(e) => setDuration(e.target.duration)}
+                onTimeUpdate={(e) => setCurrentTime(e.target.currentTime)}
+                onClick={() => {
+                  if (videoRef.current) {
+                    if (videoRef.current.paused) videoRef.current.play();
+                    else videoRef.current.pause();
+                  }
                 }}
-                className="btn-secondary"
-                style={{ padding: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.05)', borderColor: 'var(--glass-border)', color: 'var(--primary-color)', borderRadius: '4px' }}
-                title="Open Saved Directory"
-              >
-                <FolderOpen size={14} color="var(--primary-color)" />
-              </button>
-            )}
+                style={{ width: '100%', maxHeight: '280px', borderRadius: '8px', border: '1px solid var(--glass-border)', objectFit: 'contain', cursor: 'pointer' }}
+              />
+
+              <div style={{ width: '100%', marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <input 
+                  type="range"
+                  min="0"
+                  max={duration || 100}
+                  step="0.04"
+                  value={currentTime}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    setCurrentTime(val);
+                    if (videoRef.current) videoRef.current.currentTime = val;
+                  }}
+                  style={{ width: '100%', accentColor: 'var(--primary-color)', cursor: 'pointer' }}
+                />
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                  <button
+                    onClick={() => {
+                      if (videoRef.current) {
+                        if (videoRef.current.paused) videoRef.current.play();
+                        else videoRef.current.pause();
+                      }
+                    }}
+                    className="btn-secondary"
+                    style={{ padding: '6px 12px', fontSize: '11px', height: '32px' }}
+                  >
+                    {isPlaying ? <Pause size={14} /> : <Play size={14} />}
+                  </button>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '10.5px', color: 'var(--color-slate)' }}>{secondsToTimestamp(currentTime)}</span>
+                    <span style={{ fontSize: '10.5px', color: 'var(--color-slate)' }}>/ {secondsToTimestamp(duration)}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '12px' }}>
+                <button 
+                  onClick={handleCaptureFrame}
+                  className="flex-center"
+                  style={{ 
+                    width: '52px', 
+                    height: '52px', 
+                    borderRadius: '50%', 
+                    padding: 0,
+                    boxShadow: '0 4px 15px rgba(77, 155, 34, 0.25)',
+                    background: 'var(--primary-gradient)',
+                    border: 'none',
+                    cursor: 'pointer'
+                  }}
+                  title="Capture Current Frame"
+                >
+                  <Camera size={22} color="#FFF" />
+                </button>
+                <span style={{ fontSize: '9px', color: 'var(--color-slate)', marginTop: '6px', fontWeight: 'bold', letterSpacing: '1px' }}>
+                  CAPTURE FRAME STILL
+                </span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div 
+            className="dropzone flex-center" 
+            onClick={() => document.getElementById('frame-extractor-add-file-input').click()}
+            style={{ padding: '40px', flexGrow: 1 }}
+          >
+            <input 
+              type="file"
+              id="frame-extractor-add-file-input"
+              accept=".mp4,.webm,.mkv,.mov"
+              onChange={(e) => {
+                if (e.target.files && e.target.files[0]) {
+                  setVideoFile(e.target.files[0].path || e.target.files[0].name);
+                }
+              }}
+              style={{ display: 'none' }}
+            />
+            <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-white)' }}>+ Select a video file to capture stills</span>
+            <span style={{ fontSize: '10px', color: 'var(--color-slate)' }}>Supports MP4, WebM, MKV, MOV</span>
           </div>
         )}
-        
-        <div ref={containerRef}
-          style={{ flexGrow: 1, position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--canvas-bg)', borderRadius: '12px', margin: '16px 0', border: '1px solid var(--glass-border)' }}
-        >
-          {selectedFile && (
-            <>
-              {/* Floating controls toolbar */}
-              <div style={{ position: 'absolute', top: '15px', right: '15px', display: 'flex', gap: '8px', zIndex: 20 }}>
-                {!isCroppedPreview ? (
-                  <button
-                    onClick={() => setIsCroppedPreview(true)}
-                    className="btn-primary"
-                    style={{ padding: '6px 12px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--primary-color)', color: '#FFFFFF', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
-                    title="Apply Crop Preview (Enter)"
-                  >
-                    <Check size={12} color="#FFFFFF" />
-                    <span>Apply Crop</span>
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => setIsCroppedPreview(false)}
-                    className="btn-secondary"
-                    style={{ padding: '6px 12px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px', color: '#EF4444', borderColor: '#EF4444', background: 'var(--glass-bg)', borderRadius: '4px', cursor: 'pointer' }}
-                    title="Undo Preview (Esc)"
-                  >
-                    <RefreshCw size={12} />
-                    <span>Undo</span>
-                  </button>
-                )}
-              </div>
-
-              {/* Enter/Esc hint banner */}
-              <div style={{ position: 'absolute', bottom: '15px', left: '50%', transform: 'translateX(-50%)', padding: '6px 12px', borderRadius: '20px', background: 'rgba(0, 0, 0, 0.75)', border: '1px solid rgba(255, 255, 255, 0.1)', color: 'var(--color-white)', fontSize: '10px', pointerEvents: 'none', zIndex: 10, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ padding: '2px 4px', background: '#333', borderRadius: '3px', border: '1px solid #555', fontSize: '9px', fontWeight: 'bold' }}>Enter</span>
-                <span>to preview crop</span>
-                <span style={{ color: 'var(--color-slate)', margin: '0 4px' }}>|</span>
-                <span style={{ padding: '2px 4px', background: '#333', borderRadius: '3px', border: '1px solid #555', fontSize: '9px', fontWeight: 'bold' }}>Esc</span>
-                <span>to undo</span>
-              </div>
-            </>
-          )}
-
-          {selectedFile ? (
-            <canvas 
-              ref={canvasRef} 
-              onMouseDown={handleCanvasMouseDown}
-              onMouseMove={handleCanvasMouseMove}
-              onMouseUp={handleCanvasMouseUp}
-              onMouseLeave={handleCanvasMouseUp}
-              style={{ maxWidth: '100%', maxHeight: '100%', boxShadow: '0 8px 32px rgba(0,0,0,0.2)', cursor: isCroppedPreview ? 'default' : (isDragging ? 'grabbing' : 'crosshair') }} 
-            />
-          ) : (
-            <div 
-              className="dropzone flex-center"
-              style={{ width: '100%', height: '100%', border: 'none', background: 'transparent', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '10px' }}
-            >
-              <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'rgba(77,155,34,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px' }}>
-                <Image size={24} color="var(--primary-color)" />
-              </div>
-              <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--color-white)' }}>Drag & Drop Image Here</span>
-              <span style={{ fontSize: '11px', color: 'var(--color-slate)' }}>or use the file explorer to add files</span>
-            </div>
-          )}
-        </div>
       </div>
- 
-      {/* Right Sidebar */}
+
+      {/* Right Sidebar: Extracted Stills Gallery */}
       <div className="right-sidebar">
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '0 0 4px 0' }}>
-          <Crop size={20} color="var(--primary-color)" />
-          <h2 style={{ fontSize: '18px', fontWeight: '800', color: 'var(--primary-color)', margin: 0, textTransform: 'uppercase', flexGrow: 1 }}>Image Cropper</h2>
+          <Camera size={20} color="var(--primary-color)" />
+          <h2 style={{ fontSize: '18px', fontWeight: '800', color: 'var(--primary-color)', margin: 0, textTransform: 'uppercase' }}>Frame Extractor</h2>
         </div>
-        <p style={{ color: 'var(--color-slate)', fontSize: '11px', margin: '0 0 24px 0', lineHeight: '1.4' }}>Crop, straighten, and rotate images.</p>
- 
+        <p style={{ color: 'var(--color-slate)', fontSize: '11px', margin: '0 0 24px 0', lineHeight: '1.4' }}>Extract high-quality stills from video clips.</p>
+
         <div className="sidebar-settings-content">
-          {/* Category 1: Mode & Dimensions */}
-          <div style={{ marginBottom: '12px' }}>
-            <div 
-              onClick={() => setSectionModeExpanded(!sectionModeExpanded)}
-              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '6px 0', borderBottom: '1px solid var(--glass-border)', marginBottom: '10px' }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Sliders size={13} color="var(--primary-color)" />
-                <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-white)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Mode & Dimensions</span>
-              </div>
-              <span style={{ fontSize: '10px', color: 'var(--color-slate)' }}>{sectionModeExpanded ? '▼' : '▶'}</span>
-            </div>
-
-            {sectionModeExpanded && (
-              <div className="animate-fade-in" style={{ padding: '2px 0' }}>
-                <div style={{ marginBottom: '12px' }}>
-                  <span className="form-label" style={{ fontSize: '10px' }}>Mode</span>
-                  <div className="clean-preset-grid">
-                    <button 
-                      className={`clean-preset-btn ${mode === 'crop' ? 'active' : ''}`} 
-                      onClick={() => setMode('crop')} 
-                    >
-                      Crop
-                    </button>
-                    <button 
-                      className={`clean-preset-btn ${mode === 'perspective' ? 'active' : ''}`} 
-                      onClick={() => setMode('perspective')} 
-                    >
-                      Perspective
-                    </button>
-                  </div>
-                  <p style={{ margin: '8px 0 0 0', fontSize: '9.5px', color: 'var(--color-slate)', lineHeight: '1.4' }}>
-                    {mode === 'crop' 
-                      ? 'Crop Mode: Drag handles to select a rectangular area to crop or extend.' 
-                      : 'Perspective Mode: Drag the 4 corner pins to warp, align, and flatten skewed documents or signs.'
-                    }
-                  </p>
-                </div>
-
-                {mode === 'crop' && (
-                  <div style={{ marginBottom: '8px' }}>
-                    <span className="form-label" style={{ fontSize: '10px' }}>Crop Dimensions (Pixels)</span>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <div style={{ flex: 1 }}>
-                        <span style={{ fontSize: '9px', color: 'var(--color-slate)', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>WIDTH (PX)</span>
-                        <input 
-                          type="number" 
-                          className="form-input" 
-                          value={inputWidth} 
-                          onChange={(e) => handlePixelWidthChange(e.target.value)} 
-                          disabled={!selectedFile || imageSize.width === 0} 
-                          style={{ padding: '6px 10px', fontSize: '12px' }}
-                        />
-                      </div>
-                      <span style={{ color: 'var(--color-slate)', fontSize: '11px', marginTop: '14px' }}>&times;</span>
-                      <div style={{ flex: 1 }}>
-                        <span style={{ fontSize: '9px', color: 'var(--color-slate)', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>HEIGHT (PX)</span>
-                        <input 
-                          type="number" 
-                          className="form-input" 
-                          value={inputHeight} 
-                          onChange={(e) => handlePixelHeightChange(e.target.value)} 
-                          disabled={!selectedFile || imageSize.height === 0} 
-                          style={{ padding: '6px 10px', fontSize: '12px' }}
-                        />
-                      </div>
-                    </div>
-                    {selectedFile && imageSize.width > 0 && (
-                      <span style={{ display: 'block', fontSize: '9px', color: 'var(--color-slate)', marginTop: '6px' }}>
-                        Original size: {imageSize.width} &times; {imageSize.height} px
-                      </span>
-                    )}
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: 'var(--color-slate)', marginTop: '8px', cursor: 'pointer' }}>
-                      <input 
-                        type="checkbox" 
-                        checked={lockAspectRatio} 
-                        onChange={(e) => setLockAspectRatio(e.target.checked)} 
-                        style={{ width: 'auto', accentColor: 'var(--primary-color)' }}
-                      />
-                      <span>Lock Aspect Ratio</span>
-                    </label>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Category 2: Aspect Ratio */}
-          <div style={{ marginBottom: '12px' }}>
-            <div 
-              onClick={() => setSectionAspectExpanded(!sectionAspectExpanded)}
-              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '6px 0', borderBottom: '1px solid var(--glass-border)', marginBottom: '10px' }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Crop size={13} color="var(--primary-color)" />
-                <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-white)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Aspect Ratio</span>
-              </div>
-              <span style={{ fontSize: '10px', color: 'var(--color-slate)' }}>{sectionAspectExpanded ? '▼' : '▶'}</span>
-            </div>
-
-            {sectionAspectExpanded && mode === 'crop' && (
-              <div className="animate-fade-in" style={{ padding: '2px 0' }}>
-                {/* Visual Ratio Cards Row */}
-                <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                  {/* 16:9 Card */}
-                  <button 
-                    className={`clean-preset-btn ${aspectRatio === '16:9' ? 'active' : ''}`}
-                    onClick={() => handleAspectRatioChange('16:9')}
-                    style={{
-                      flex: 1,
-                      aspectRatio: '1',
-                      padding: '8px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      background: aspectRatio === '16:9' ? 'rgba(114, 188, 40, 0.08)' : 'rgba(255,255,255,0.02)',
-                      border: aspectRatio === '16:9' ? '1.5px solid var(--primary-color)' : '1px solid var(--glass-border)',
-                      borderRadius: '8px',
-                      height: 'auto',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    <div style={{
-                      width: '100%',
-                      aspectRatio: '16/9',
-                      background: theme === 'light' ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)',
-                      borderRadius: '4px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '11px',
-                      fontWeight: 'bold',
-                      color: 'var(--color-white)'
-                    }}>
-                      16:9
-                    </div>
-                  </button>
-
-                  {/* 9:16 Card */}
-                  <button 
-                    className={`clean-preset-btn ${aspectRatio === '9:16' ? 'active' : ''}`}
-                    onClick={() => handleAspectRatioChange('9:16')}
-                    style={{
-                      flex: 1,
-                      aspectRatio: '1',
-                      padding: '8px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      background: aspectRatio === '9:16' ? 'rgba(114, 188, 40, 0.08)' : 'rgba(255,255,255,0.02)',
-                      border: aspectRatio === '9:16' ? '1.5px solid var(--primary-color)' : '1px solid var(--glass-border)',
-                      borderRadius: '8px',
-                      height: 'auto',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    <div style={{
-                      height: '100%',
-                      aspectRatio: '9/16',
-                      background: theme === 'light' ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)',
-                      borderRadius: '4px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '11px',
-                      fontWeight: 'bold',
-                      color: 'var(--color-white)'
-                    }}>
-                      9:16
-                    </div>
-                  </button>
-
-                  {/* 1:1 Card */}
-                  <button 
-                    className={`clean-preset-btn ${aspectRatio === '1:1' ? 'active' : ''}`}
-                    onClick={() => handleAspectRatioChange('1:1')}
-                    style={{
-                      flex: 1,
-                      aspectRatio: '1',
-                      padding: '8px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      background: aspectRatio === '1:1' ? 'rgba(114, 188, 40, 0.08)' : 'rgba(255,255,255,0.02)',
-                      border: aspectRatio === '1:1' ? '1.5px solid var(--primary-color)' : '1px solid var(--glass-border)',
-                      borderRadius: '8px',
-                      height: 'auto',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    <div style={{
-                      width: '75%',
-                      aspectRatio: '1/1',
-                      background: theme === 'light' ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)',
-                      borderRadius: '4px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '11px',
-                      fontWeight: 'bold',
-                      color: 'var(--color-white)'
-                    }}>
-                      1:1
-                    </div>
-                  </button>
-                </div>
-
-                {/* Other presets selector */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginTop: '8px' }}>
+          {/* Active Still Inspector */}
+          {activeStill && (
+            <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+              <div style={{ padding: '0', background: 'rgba(0,0,0,0.05)', borderRadius: '6px', border: '1px solid var(--glass-border)', overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
+                {onOpenFullscreenPreview && (
                   <button
-                    className={`clean-preset-btn ${aspectRatio === 'free' ? 'active' : ''}`}
-                    onClick={() => handleAspectRatioChange('free')}
-                    style={{ padding: '6px 8px', fontSize: '10.5px' }}
+                    onClick={() => onOpenFullscreenPreview({ ...activeStill, name: `frame_${activeStill.timestamp}.png` })}
+                    className="btn-secondary"
+                    style={{ position: 'absolute', top: '6px', right: '6px', padding: '4px', borderRadius: '4px', background: 'rgba(0,0,0,0.5)', border: 'none', cursor: 'pointer', zIndex: 5 }}
+                    title="Open Fullscreen Preview"
                   >
-                    Free Ratio
+                    <Maximize2 size={12} color="#FFFFFF" />
                   </button>
-                  <select
-                    className="form-input"
-                    value={['16:9', '9:16', '1:1', 'free'].includes(aspectRatio) ? 'other' : aspectRatio}
-                    onChange={(e) => {
-                      if (e.target.value !== 'other') {
-                        handleAspectRatioChange(e.target.value);
-                      }
-                    }}
-                    style={{ padding: '4px 8px', fontSize: '10.5px', borderRadius: '6px', height: '28px', backgroundColor: 'rgba(255,255,255,0.02)' }}
-                  >
-                    <option value="other" disabled>Other Ratios...</option>
-                    <option value="4:3">4:3 Standard</option>
-                    <option value="3:2">3:2 Classic</option>
-                    <option value="3:4">3:4 Portrait</option>
-                    <option value="2:3">2:3 Portrait</option>
-                  </select>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Category 3: Adjustments */}
-          <div style={{ marginBottom: '12px' }}>
-            <div 
-              onClick={() => setSectionAdjustExpanded(!sectionAdjustExpanded)}
-              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '6px 0', borderBottom: '1px solid var(--glass-border)', marginBottom: '10px' }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <RefreshCw size={13} color="var(--primary-color)" />
-                <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-white)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Adjustments</span>
-              </div>
-              <span style={{ fontSize: '10px', color: 'var(--color-slate)' }}>{sectionAdjustExpanded ? '▼' : '▶'}</span>
-            </div>
-
-            {sectionAdjustExpanded && (
-              <div className="animate-fade-in" style={{ padding: '2px 0' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--color-slate)', marginBottom: '4px', fontWeight: '600' }}>
-                      <span>Straighten</span>
-                      <span>{rotation}°</span>
-                    </div>
-                    <input type="range" min="-45" max="45" value={rotation} onChange={(e) => setRotation(Number(e.target.value))} style={{ width: '100%' }} />
-                  </div>
-                  {mode === 'perspective' && (
-                    <>
-                      <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--color-slate)', marginBottom: '4px', fontWeight: '600' }}>
-                          <span>Horizontal Tilt (Keystone)</span>
-                          <span>{tiltX}°</span>
-                        </div>
-                        <input type="range" min="-45" max="45" value={tiltX} onChange={(e) => setTiltX(Number(e.target.value))} style={{ width: '100%' }} />
-                      </div>
-                      <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--color-slate)', marginBottom: '4px', fontWeight: '600' }}>
-                          <span>Vertical Tilt</span>
-                          <span>{tiltY}°</span>
-                        </div>
-                        <input type="range" min="-45" max="45" value={tiltY} onChange={(e) => setTiltY(Number(e.target.value))} style={{ width: '100%' }} />
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Category 4: Extend Image */}
-          <div style={{ marginBottom: '12px' }}>
-            <div 
-              onClick={() => setSectionExtendExpanded(!sectionExtendExpanded)}
-              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '6px 0', borderBottom: '1px solid var(--glass-border)', marginBottom: '10px' }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Maximize size={13} color="var(--primary-color)" />
-                <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-white)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Extend Image</span>
-              </div>
-              <span style={{ fontSize: '10px', color: 'var(--color-slate)' }}>{sectionExtendExpanded ? '▼' : '▶'}</span>
-            </div>
-
-            {sectionExtendExpanded && (
-              <div className="animate-fade-in" style={{ padding: '2px 0' }}>
-                <span className="form-label" style={{ fontSize: '10px' }}>Fill Mode</span>
-                <div className="clean-preset-grid" style={{ marginBottom: '8px' }}>
-                  <button 
-                    className={`clean-preset-btn ${fillMode === 'solid' ? 'active' : ''}`}
-                    onClick={() => setFillMode('solid')}
-                  >
-                    Solid
-                  </button>
-                  <button 
-                    className={`clean-preset-btn ${fillMode === 'blur' ? 'active' : ''}`}
-                    onClick={() => setFillMode('blur')}
-                  >
-                    Blur
-                  </button>
-                  <button 
-                    className={`clean-preset-btn ${fillMode === 'mirror' ? 'active' : ''}`}
-                    onClick={() => setFillMode('mirror')}
-                  >
-                    Mirror
-                  </button>
-                </div>
-                {fillMode === 'solid' && (
-                  <input type="color" value={fillColor} onChange={(e) => setFillColor(e.target.value)} style={{ width: '100%', height: '30px', border: 'none', borderRadius: '4px', cursor: 'pointer', background: 'transparent' }} />
                 )}
-                <p style={{ margin: '8px 0 0 0', fontSize: '9.5px', color: 'var(--color-slate)', lineHeight: '1.4' }}>
-                  {fillMode === 'solid' && 'Solid Mode: Extends the image border with a solid background color.'}
-                  {fillMode === 'blur' && 'Blur Mode: Fills the extended boundaries with a blurred replica of the image.'}
-                  {fillMode === 'mirror' && 'Mirror Mode: Extends the margins by reflecting the edge pixels outwards.'}
-                </p>
+                <img src={activeStill.dataUrl} style={{ width: '100%', maxHeight: '180px', objectFit: 'contain' }} alt="Selected still" />
               </div>
-            )}
-          </div>
 
-          {/* Category 5: Output Format */}
-          <div style={{ marginBottom: '20px' }}>
-            <div 
-              onClick={() => setSectionFormatExpanded(!sectionFormatExpanded)}
-              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '6px 0', borderBottom: '1px solid var(--glass-border)', marginBottom: '10px' }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <FileImage size={13} color="var(--primary-color)" />
-                <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-white)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Output Format</span>
-              </div>
-              <span style={{ fontSize: '10px', color: 'var(--color-slate)' }}>{sectionFormatExpanded ? '▼' : '▶'}</span>
+              <button 
+                onClick={() => handleSaveStillLocally(activeStill)} 
+                className="btn-secondary flex-center"
+                style={{ width: '100%', padding: '8px 0', borderRadius: '4px', gap: '6px' }}
+              >
+                <Download size={13} color="var(--primary-color)" />
+                <span style={{ fontSize: '11px', fontWeight: 'bold' }}>Save Still ({activeStill.timestamp})</span>
+              </button>
             </div>
-
-            {sectionFormatExpanded && (
-              <div className="animate-fade-in" style={{ padding: '2px 0' }}>
-                <div className="clean-preset-grid">
-                  {['jpg', 'png', 'webp'].map((fmt) => (
-                    <button
-                      key={fmt}
-                      className={`clean-preset-btn ${outputFormat === fmt ? 'active' : ''}`}
-                      onClick={() => setOutputFormat(fmt)}
-                    >
-                      {fmt.toUpperCase()}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Sticky Pinned Button Container */}
-        <div style={{ paddingTop: '15px', borderTop: '1px solid var(--glass-border)', flexShrink: 0 }}>
-          <button 
-            className="process-action-btn flex-center"
-            onClick={handleSaveCrop}
-            disabled={!selectedFile}
-            style={{ width: '100%', color: '#FFFFFF', justifyContent: 'center', gap: '6px' }}
-          >
-            <Crop size={14} color="#FFFFFF" />
-            <span style={{ color: '#FFFFFF' }}>Save Crop</span>
-          </button>
+          )}
         </div>
       </div>
     </div>
@@ -1625,7 +990,7 @@ export default function App() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: isSidebarCollapsed ? 'center' : 'space-between', padding: '0 16px', marginBottom: '20px', flexShrink: 0 }}>
           {!isSidebarCollapsed && (
             <div style={{ display: 'flex', alignItems: 'center', flexGrow: 1, paddingLeft: '8px' }}>
-              <img src={theme === 'light' ? 'logo_light.png' : 'logo.png'} style={{ height: '52px', maxWidth: '160px', objectFit: 'contain' }} alt="RFINE" draggable="false" />
+              <img src={theme === 'light' ? 'logo_light.png' : 'logo.png'} style={{ height: '52px', maxWidth: '160px', objectFit: 'contain' }} alt="RFINE" className="app-logo-img" draggable="false" />
             </div>
           )}
           <button 
@@ -1787,7 +1152,7 @@ export default function App() {
                   What would you like to <span style={{ color: 'var(--primary-color)' }}>refine</span> today?
                 </h1>
                 <p style={{ fontSize: '10px', color: 'var(--color-slate)', letterSpacing: '1px', textTransform: 'uppercase', margin: 0, fontWeight: 'bold', opacity: 0.8 }}>
-                  Offline Media Suite
+                  Media Suite
                 </p>
               </div>
 
@@ -2013,6 +1378,10 @@ export default function App() {
               explorerHeight={explorerHeight}
               handleDividerMouseDown={handleDividerMouseDown}
               theme={theme}
+              openFolderPicker={openFolderPicker}
+              addRecentProcess={addRecentProcess}
+              setGlobalProgress={setGlobalProgress}
+              onOpenFullscreenPreview={(f) => setFullscreenPreviewFile(f)}
             />
           )}
 
@@ -2023,25 +1392,19 @@ export default function App() {
               toggleFileBrowser={toggleFileBrowser}
               isFileBrowserCollapsed={isFileBrowserCollapsed}
               explorerHeight={explorerHeight}
-              setExplorerHeight={updateExplorerHeight}
+              handleDividerMouseDown={handleDividerMouseDown}
               theme={theme}
               openFolderPicker={openFolderPicker}
-              isDraggingFile={isDraggingFile}
               addRecentProcess={addRecentProcess}
               setGlobalProgress={setGlobalProgress}
               explorerPreviewFile={explorerPreviewFile}
               setExplorerPreviewFile={setExplorerPreviewFile}
-              onOpenFullscreenPreview={setFullscreenPreviewFile}
             />
           )}
 
           {activeTab === 'color-studio' && (
             <ColorStudio
               theme={theme}
-              explorerHeight={explorerHeight}
-              setExplorerHeight={updateExplorerHeight}
-              isFileBrowserCollapsed={isFileBrowserCollapsed}
-              toggleFileBrowser={toggleFileBrowser}
             />
           )}
 
@@ -2064,10 +1427,9 @@ export default function App() {
               toggleFileBrowser={toggleFileBrowser}
               isFileBrowserCollapsed={isFileBrowserCollapsed}
               explorerHeight={explorerHeight}
-              setExplorerHeight={updateExplorerHeight}
+              setExplorerHeight={setExplorerHeight}
               theme={theme}
               openFolderPicker={openFolderPicker}
-              isDraggingFile={isDraggingFile}
               addRecentProcess={addRecentProcess}
               setGlobalProgress={setGlobalProgress}
               mode="compress"
@@ -2075,19 +1437,18 @@ export default function App() {
           )}
 
           {activeTab === 'video-extract' && (
-            <VideoCompressor
-              files={videoFile ? [videoFile] : []}
-              setFiles={(f) => setVideoFile(f[0] || null)}
+            <FrameExtractor
+              videoFile={videoFile}
+              setVideoFile={setVideoFile}
               toggleFileBrowser={toggleFileBrowser}
               isFileBrowserCollapsed={isFileBrowserCollapsed}
               explorerHeight={explorerHeight}
-              setExplorerHeight={updateExplorerHeight}
+              handleDividerMouseDown={handleDividerMouseDown}
               theme={theme}
               openFolderPicker={openFolderPicker}
-              isDraggingFile={isDraggingFile}
               addRecentProcess={addRecentProcess}
               setGlobalProgress={setGlobalProgress}
-              mode="extract"
+              onOpenFullscreenPreview={(f) => setFullscreenPreviewFile(f)}
             />
           )}
 
@@ -2098,10 +1459,9 @@ export default function App() {
               toggleFileBrowser={toggleFileBrowser}
               isFileBrowserCollapsed={isFileBrowserCollapsed}
               explorerHeight={explorerHeight}
-              setExplorerHeight={updateExplorerHeight}
+              handleDividerMouseDown={handleDividerMouseDown}
               theme={theme}
               openFolderPicker={openFolderPicker}
-              isDraggingFile={isDraggingFile}
               addRecentProcess={addRecentProcess}
               setGlobalProgress={setGlobalProgress}
             />
@@ -2114,10 +1474,9 @@ export default function App() {
               toggleFileBrowser={toggleFileBrowser}
               isFileBrowserCollapsed={isFileBrowserCollapsed}
               explorerHeight={explorerHeight}
-              setExplorerHeight={updateExplorerHeight}
+              handleDividerMouseDown={handleDividerMouseDown}
               theme={theme}
               openFolderPicker={openFolderPicker}
-              isDraggingFile={isDraggingFile}
               addRecentProcess={addRecentProcess}
               setGlobalProgress={setGlobalProgress}
             />
@@ -2130,93 +1489,25 @@ export default function App() {
               toggleFileBrowser={toggleFileBrowser}
               isFileBrowserCollapsed={isFileBrowserCollapsed}
               explorerHeight={explorerHeight}
-              setExplorerHeight={updateExplorerHeight}
+              handleDividerMouseDown={handleDividerMouseDown}
               theme={theme}
               openFolderPicker={openFolderPicker}
-              isDraggingFile={isDraggingFile}
               addRecentProcess={addRecentProcess}
               setGlobalProgress={setGlobalProgress}
-              explorerPreviewFile={explorerPreviewFile}
-              setExplorerPreviewFile={setExplorerPreviewFile}
-              onOpenFullscreenPreview={setFullscreenPreviewFile}
             />
           )}
-
 
           {activeTab === 'case-converter' && (
             <CaseConverter theme={theme} />
           )}
 
           {activeTab === 'settings' && (
-
-            <Settings theme={theme} />
+            <SettingsTab theme={theme} setTheme={setTheme} openFolderPicker={openFolderPicker} />
           )}
         </div>
       </main>
-    
-      {/* About Dialog Modal */}
-      {isAboutOpen && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100vw',
-          height: '100vh',
-          background: 'rgba(4, 5, 8, 0.85)',
-          backdropFilter: 'blur(12px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 999999
-        }}>
-          <div className="glass-panel animate-fade-in animate-slide-in" style={{
-            width: '420px',
-            padding: '30px 24px',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            textAlign: 'center',
-            gap: '16px',
-            position: 'relative'
-          }}>
-            <button onClick={() => setIsAboutOpen(false)}
-              className="btn-secondary flex-center"
-              style={{ position: 'absolute', top: '15px', right: '15px', padding: '6px', borderRadius: '50%', width: '28px', height: '28px', justifyContent: 'center' }}
-              title="Close"
-            >
-              <X size={14} />
-            </button>
-            <div style={{ marginBottom: '10px' }}>
-              <img src={theme === 'light' ? 'logo_light.png' : 'logo.png'} style={{ maxHeight: '42px', width: 'auto' }} alt="RFINE Logo" />
-              <span style={{ fontSize: '10px', color: 'var(--primary-color)', display: 'block', marginTop: '6px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '2px' }}>
-                Refined Media Utilities
-              </span>
-            </div>
-            <p style={{ fontSize: '11px', color: 'var(--color-slate)', lineHeight: '1.6', margin: '0 0 10px 0' }}>
-              Version 1.3.0 (Offline Mode)<br/>
-              A high-performance offline desktop media processing workshop designed for speed, privacy, and visual elegance.
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: '8px', borderTop: '1px solid var(--glass-border)', paddingTop: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--color-slate)' }}>
-                <span>OS Version:</span>
-                <span style={{ color: 'var(--color-white)', fontWeight: 'bold' }}>Windows x64</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--color-slate)' }}>
-                <span>Build Engine:</span>
-                <span style={{ color: 'var(--color-white)', fontWeight: 'bold' }}>Electron + React</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--color-slate)' }}>
-                <span>Local Server:</span>
-                <span style={{ color: 'var(--color-white)', fontWeight: 'bold' }}>Online (Port 5001)</span>
-              </div>
-            </div>
-            <button onClick={() => setIsAboutOpen(false)} className="btn-primary" style={{ width: '100%', marginTop: '12px', padding: '8px', fontSize: '11px' }}>
-              Dismiss
-            </button>
-          </div>
-        </div>
-      )}
-</div>
+      <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} theme={theme} />
+    </div>
   );
 }
 
@@ -2231,60 +1522,57 @@ function FileExplorer({ onAddFiles, allowedExtensions = [], maxListHeight = null
   const [selectedItems, setSelectedItems] = useState({});
   const [roots, setRoots] = useState({ home: '', drives: [] });
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('name'); // 'name', 'modified', 'size'
+  const [sortOrder, setSortOrder] = useState('asc'); // 'asc', 'desc'
   const fileInputRef = useRef(null);
 
   const [favorites, setFavorites] = useState(() => {
-    const val = localStorage.getItem('rfine_favorites');
-    return val ? JSON.parse(val) : [];
+    try {
+      return JSON.parse(localStorage.getItem('rfine_favorite_folders')) || [];
+    } catch {
+      return [];
+    }
   });
 
-  const handleSystemBrowse = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
-    }
-  };
-
-  const handleFileInputChange = (e) => {
-    if (!e.target.files) return;
-    const selected = Array.from(e.target.files).map(file => ({
-      name: file.name,
-      path: file.path,
-      size: file.size,
-      ext: file.name.substring(file.name.lastIndexOf('.'))
-    }));
-    onAddFiles(selected);
-  };
-
-  const handleBrowseFolder = () => {
-    if (!openFolderPicker) return;
-    openFolderPicker(currentPath, (selectedPath) => {
-      loadDirectory(selectedPath);
-    });
+  const syncFavorites = () => {
+    try {
+      setFavorites(JSON.parse(localStorage.getItem('rfine_favorite_folders')) || []);
+    } catch {}
   };
 
   const loadDirectory = async (dirPath) => {
     try {
-      const res = await fetch(`${API_BASE}/files?path=` + encodeURIComponent(dirPath));
+      const res = await fetch(`${API_BASE}/scan-dir?path=` + encodeURIComponent(dirPath));
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to read directory');
       setCurrentPath(data.currentPath);
       setParentPath(data.parentPath || '');
       setItems(data.items || []);
-      setRoots(data.roots || { home: '', drives: [] });
       setExplorerError('');
-      if (storageKey) {
-        localStorage.setItem(storageKey, data.currentPath);
-      }
+      if (storageKey) localStorage.setItem(storageKey, data.currentPath);
       if (onPathChange) onPathChange(data.currentPath);
+      syncFavorites();
     } catch (err) {
       setExplorerError(err.message);
     }
   };
 
   useEffect(() => {
-    const initial = defaultPath || roots.home || '';
-    const cached = storageKey ? localStorage.getItem(storageKey) : null;
-    loadDirectory(cached || initial);
+    const initRootsAndPath = async () => {
+      let homePath = '';
+      try {
+        const rootsRes = await fetch(`${API_BASE}/explorer/roots`);
+        if (rootsRes.ok) {
+          const rootsData = await rootsRes.json();
+          setRoots(rootsData);
+          homePath = rootsData.home;
+        }
+      } catch (err) {}
+      const initial = defaultPath || homePath || '';
+      const cached = storageKey ? localStorage.getItem(storageKey) : null;
+      loadDirectory(cached || initial);
+    };
+    initRootsAndPath();
   }, []);
 
   const handleItemClick = (item, index, e) => {
@@ -2300,6 +1588,7 @@ function FileExplorer({ onAddFiles, allowedExtensions = [], maxListHeight = null
   };
 
   const toggleFavorite = () => {
+    if (!currentPath) return;
     let updated;
     if (favorites.includes(currentPath)) {
       updated = favorites.filter(p => p !== currentPath);
@@ -2307,7 +1596,7 @@ function FileExplorer({ onAddFiles, allowedExtensions = [], maxListHeight = null
       updated = [...favorites, currentPath];
     }
     setFavorites(updated);
-    localStorage.setItem('rfine_favorites', JSON.stringify(updated));
+    localStorage.setItem('rfine_favorite_folders', JSON.stringify(updated));
   };
 
   const handleAddSelected = () => {
@@ -2327,10 +1616,7 @@ function FileExplorer({ onAddFiles, allowedExtensions = [], maxListHeight = null
           src={`${API_BASE}/image-preview?path=` + encodeURIComponent(item.path)}
           alt=""
           style={{ width: '20px', height: '20px', objectFit: 'cover', borderRadius: '3px', flexShrink: 0 }}
-          onError={(e) => {
-            e.target.onerror = null;
-            e.target.style.display = 'none';
-          }}
+          onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }}
         />
       );
     }
@@ -2350,238 +1636,164 @@ function FileExplorer({ onAddFiles, allowedExtensions = [], maxListHeight = null
   const sortedItems = [...filteredItems].sort((a, b) => {
     if (a.isDir && !b.isDir) return -1;
     if (!a.isDir && b.isDir) return 1;
-    return a.name.localeCompare(b.name);
+
+    let res = 0;
+    if (sortBy === 'name') {
+      res = a.name.localeCompare(b.name);
+    } else if (sortBy === 'modified') {
+      res = (a.mtime || 0) - (b.mtime || 0);
+    } else if (sortBy === 'size') {
+      res = (a.size || 0) - (b.size || 0);
+    }
+    return sortOrder === 'asc' ? res : -res;
   });
 
   const handleSelectAll = () => {
     const newSelections = {};
-    sortedItems.forEach(item => {
-      if (!item.isDir) {
-        newSelections[item.path] = item;
-      }
-    });
+    sortedItems.forEach(item => { if (!item.isDir) newSelections[item.path] = item; });
     setSelectedItems(newSelections);
   };
 
-  const handleDeselectAll = () => {
-    setSelectedItems({});
-  };
-
+  const handleDeselectAll = () => setSelectedItems({});
   const isFavorite = favorites.includes(currentPath);
 
   return (
-    <div className={flat ? "flat-explorer" : "glass-card animate-fade-in"} style={flat ? { display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', flex: 1, minHeight: 0, position: 'relative' } : { padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', flex: 1, minHeight: 0, position: 'relative' }}>
-      {!flat && onCollapse && (
-        <button
-          onClick={onCollapse}
-          className="collapsible-toggle-btn"
-          style={{
-            position: 'absolute',
-            top: '12px',
-            right: '12px',
-            border: 'none',
-            background: 'transparent',
-            width: '24px',
-            height: '24px',
-            zIndex: 10
-          }}
-          title="Collapse File Explorer"
-        >
-          <ChevronUp size={14} color="var(--color-white)" />
-        </button>
-      )}
-      {/* Roots Shortcuts */}
-      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
-        <button 
-          onClick={() => loadDirectory(roots.home)}
-          className="btn-secondary"
-          style={{ padding: '4px 8px', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '4px', borderRadius: '4px' }}
-        >
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', flex: 1, minHeight: 0, position: 'relative' }}>
+      {/* Row 1: Quick Access Chips */}
+      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+        <button onClick={() => loadDirectory(roots.home)} className="btn-secondary" style={{ padding: '3px 8px', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '4px', borderRadius: '4px' }}>
           <Home size={10} />
           <span>Home Directory</span>
         </button>
         {roots.drives && roots.drives.map(drive => (
-          <button 
-            key={drive}
-            onClick={() => loadDirectory(drive)}
-            className="btn-secondary"
-            style={{ padding: '4px 8px', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '4px', borderRadius: '4px' }}
-          >
+          <button key={drive} onClick={() => loadDirectory(drive)} className="btn-secondary" style={{ padding: '3px 8px', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '4px', borderRadius: '4px' }}>
             <HardDrive size={10} />
             <span>{drive}</span>
           </button>
         ))}
         {favorites.map(fav => (
-          <button 
-            key={fav}
-            onClick={() => loadDirectory(fav)}
-            className="btn-secondary"
-            style={{ padding: '4px 8px', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '4px', borderRadius: '4px', color: '#72BC28', borderColor: '#72BC28' }}
-          >
-            <Star size={10} color="#72BC28" />
+          <button key={fav} onClick={() => loadDirectory(fav)} className="btn-secondary" style={{ padding: '3px 8px', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '4px', borderRadius: '4px', color: 'var(--primary-color)', borderColor: 'var(--primary-color)' }}>
+            <Star size={10} color="var(--primary-color)" fill="var(--primary-color)" />
             <span>{path.basename(fav) || fav}</span>
           </button>
         ))}
       </div>
 
-      {/* Path Breadcrumbs Bar */}
-      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px' }}>
-        <button 
-          onClick={() => loadDirectory(parentPath)}
-          disabled={!parentPath}
-          className="btn-secondary"
-          style={{ padding: '6px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          title="Back"
-        >
+      {/* Row 2: Path Breadcrumbs Bar */}
+      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+        <button onClick={() => loadDirectory(parentPath)} disabled={!parentPath} className="btn-secondary" style={{ padding: '5px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Back">
           <ArrowLeft size={12} />
         </button>
-        
-        <input 
-          type="text" 
-          className="form-input" 
-          value={currentPath}
-          onChange={(e) => setCurrentPath(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && loadDirectory(currentPath)}
-          style={{ flexGrow: 1, padding: '4px 10px', fontSize: '11px', borderRadius: '4px' }}
-        />
-
-        <button 
-          onClick={toggleFavorite}
-          className="btn-secondary"
-          style={{ padding: '6px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          title={isFavorite ? "Bookmark this folder" : "Bookmark this folder"}
-        >
-          <Star size={12} fill={isFavorite ? "#72BC28" : "none"} color={isFavorite ? "#72BC28" : "currentColor"} />
+        <input type="text" className="form-input" value={currentPath} onChange={(e) => setCurrentPath(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && loadDirectory(currentPath)} style={{ flexGrow: 1, padding: '4px 10px', fontSize: '11px', borderRadius: '4px' }} />
+        <button onClick={toggleFavorite} className="btn-secondary" style={{ padding: '5px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title={isFavorite ? "Remove Bookmark" : "Bookmark Folder"}>
+          <Star size={12} fill={isFavorite ? "var(--primary-color)" : "none"} color={isFavorite ? "var(--primary-color)" : "currentColor"} />
         </button>
-
-        <button 
-          onClick={() => loadDirectory(currentPath)}
-          className="btn-secondary"
-          style={{ padding: '6px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          title="Refresh"
-        >
+        <button onClick={() => loadDirectory(currentPath)} className="btn-secondary" style={{ padding: '5px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Refresh">
           <RefreshCw size={12} />
         </button>
       </div>
 
-      {/* Search & Sort Panel */}
-      <div style={{ display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-        <div style={{ display: 'flex', gap: '6px' }}>
-          {/* Sorting dropdown */}
+      {/* Row 3: Sort Options (Left) + Search Input (Right) */}
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ fontSize: '10px', color: 'var(--color-slate)', fontWeight: 'bold' }}>Sort:</span>
+          <select className="form-input" value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={{ padding: '3px 6px', fontSize: '10.5px', width: '95px' }}>
+            <option value="name">Name</option>
+            <option value="modified">Modified</option>
+            <option value="size">Size</option>
+          </select>
+          <select className="form-input" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} style={{ padding: '3px 6px', fontSize: '10.5px', width: '70px' }}>
+            <option value="asc">Asc</option>
+            <option value="desc">Desc</option>
+          </select>
         </div>
-        <input 
-          type="text" 
-          className="form-input" 
-          placeholder="Search files..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          style={{ width: '180px', padding: '4px 8px', fontSize: '11px', borderRadius: '4px' }}
-        />
+
+        <div style={{ position: 'relative' }}>
+          <input type="text" className="form-input" placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ width: '160px', padding: '3px 8px 3px 24px', fontSize: '10.5px', borderRadius: '4px' }} />
+          <Search size={11} color="var(--color-slate)" style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)' }} />
+        </div>
       </div>
 
-      {/* Explorer Content list */}
-      <div style={{ flexGrow: 1, overflowY: 'auto', maxHeight: maxListHeight || '200px', border: '1px solid var(--glass-border)', borderRadius: '6px', background: 'rgba(0,0,0,0.1)', padding: '6px', display: 'flex', flexDirection: 'column', gap: '2px', minHeight: '80px' }}>
+      {/* Row 4: File List Box */}
+      <div style={{ flexGrow: 1, overflowY: 'auto', maxHeight: maxListHeight || '220px', border: '1px solid var(--glass-border)', borderRadius: '6px', background: theme === 'light' ? '#F8FAFC' : 'rgba(0,0,0,0.15)', padding: '4px', display: 'flex', flexDirection: 'column', gap: '2px', minHeight: '100px' }}>
         {explorerError ? (
           <div style={{ color: '#EF4444', fontSize: '11px', padding: '10px', textAlign: 'center' }}>{explorerError}</div>
         ) : sortedItems.length === 0 ? (
           <div style={{ color: 'var(--color-slate)', fontSize: '11px', padding: '10px', textAlign: 'center' }}>No items found</div>
         ) : (
-          sortedItems.map((item, idx) => (
-            <div 
-              key={item.path}
-              onClick={(e) => handleItemClick(item, idx, e)}
-              className={`explorer-item ${selectedItems[item.path] ? 'active' : ''}`}
-              style={{ display: 'flex', alignItems: 'center', justifyContext: 'space-between', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer', transition: 'all 0.15s ease' }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                {!item.isDir && (
-                  <input 
-                    type="checkbox" 
-                    checked={!!selectedItems[item.path]}
-                    onChange={() => {}}
-                    style={{ margin: 0, accentColor: 'var(--primary-color)' }}
-                  />
+          sortedItems.map((item, idx) => {
+            const isSel = !!selectedItems[item.path];
+            return (
+              <div 
+                key={item.path} 
+                onClick={(e) => handleItemClick(item, idx, e)}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 8px', borderRadius: '4px', cursor: 'pointer', background: isSel ? 'rgba(77, 155, 34, 0.15)' : 'transparent', transition: 'all 0.15s ease' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flexGrow: 1 }}>
+                  {!item.isDir && (
+                    <input type="checkbox" checked={isSel} onChange={() => {}} style={{ cursor: 'pointer' }} />
+                  )}
+                  {renderIcon(item)}
+                  <span style={{ fontSize: '11px', fontWeight: item.isDir ? 'bold' : 'normal', color: 'var(--color-white)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                    {item.name}
+                  </span>
+                </div>
+                {!item.isDir && item.size > 0 && (
+                  <span style={{ fontSize: '10px', color: 'var(--color-slate)', marginLeft: '10px', flexShrink: 0 }}>{formatFileSize(item.size)}</span>
                 )}
-                {renderIcon(item)}
-                <span style={{ fontSize: '11.5px', color: 'var(--color-white)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{item.name}</span>
               </div>
-              {!item.isDir && (
-                <span style={{ fontSize: '10px', color: 'var(--color-slate)' }}>{formatFileSize(item.size)}</span>
-              )}
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 
-      {showActions && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
-          <div style={{ display: 'flex', gap: '6px' }}>
-            <button 
-              onClick={handleSelectAll}
-              className="btn-secondary"
-              style={{ padding: '4px 8px', fontSize: '10.5px', borderRadius: '4px', height: '24px', display: 'flex', alignItems: 'center' }}
-            >
-              Select All
-            </button>
-            <button 
-              onClick={handleDeselectAll}
-              className="btn-secondary"
-              style={{ padding: '4px 8px', fontSize: '10.5px', borderRadius: '4px', height: '24px', display: 'flex', alignItems: 'center' }}
-            >
-              Deselect All
-            </button>
-          </div>
-          
-          <button 
-            onClick={handleAddSelected}
-            disabled={Object.values(selectedItems).filter(Boolean).length === 0}
-            className="btn-primary"
-            style={{ padding: '6px 12px', fontSize: '11px', borderRadius: '6px' }}
-          >
-            Add Selected ({Object.values(selectedItems).filter(Boolean).length})
-          </button>
+      {/* Row 5: Action Buttons Footer Bar */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <button onClick={handleSelectAll} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '10px' }}>Select All</button>
+          <button onClick={handleDeselectAll} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '10px' }}>Deselect All</button>
         </div>
-      )}
+        <button onClick={handleAddSelected} className="btn-primary" style={{ padding: '5px 14px', fontSize: '10px', borderRadius: '4px' }}>
+          ADD SELECTED ({Object.values(selectedItems).filter(Boolean).length})
+        </button>
+      </div>
     </div>
   );
 }
 
+
 // ----------------------------------------------------------------------------
-// IMAGE RESIZER COMPONENT
-// ----------------------------------------------------------------------------
-function ImageResizer({ files, onFilesChange, toggleFileBrowser, isFileBrowserCollapsed, explorerHeight, handleDividerMouseDown, theme }) {
+function ImageResizer({ files, onFilesChange, toggleFileBrowser, isFileBrowserCollapsed, explorerHeight, handleDividerMouseDown, theme, openFolderPicker, addRecentProcess, setGlobalProgress, onOpenFullscreenPreview }) {
   const [activePreviewFile, setActivePreviewFile] = useState(null);
   const [successResult, setSuccessResult] = useState(null);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [processing, setProcessing] = useState(false);
   const [format, setFormat] = useState('png');
-  const [resizeMode, setResizeMode] = useState('percentage');
+  const [resizeMode, setResizeMode] = useState('none');
   const [width, setWidth] = useState('');
   const [height, setHeight] = useState('');
   const [scalePercent, setScalePercent] = useState('80');
   const [quality, setQuality] = useState('80');
-  const [outputFolder, setOutputFolder] = useState('');
-  const [watermarkText, setWatermarkText] = useState('');
-  const [watermarkPosition, setWatermarkPosition] = useState('bottom-right');
-  const [keepMetadata, setKeepMetadata] = useState(true);
+  const [proportionateAnchor, setProportionateAnchor] = useState('width');
+  const [proportionateValue, setProportionateValue] = useState('1920');
 
-  // Drag and drop sorting
+  const [saveDestMode, setSaveDestMode] = useState(() => localStorage.getItem('rfine_img_save_dest_mode') || 'original');
+  const [customDestPath, setCustomDestPath] = useState(() => localStorage.getItem('rfine_img_custom_dest_path') || '');
+  const [openOnComplete, setOpenOnComplete] = useState(() => {
+    const val = localStorage.getItem('rfine_img_open_on_complete');
+    return val === null ? true : val === 'true';
+  });
+
+  const [sectionConfigExpanded, setSectionConfigExpanded] = useState(true);
+  const [sectionResizeExpanded, setSectionResizeExpanded] = useState(true);
+  const [sectionSaveExpanded, setSectionSaveExpanded] = useState(true);
+
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
 
-  const handleDragStart = (e, index) => {
-    setDraggedIndex(index);
-  };
-  const handleDragOver = (e, index) => {
-    e.preventDefault();
-    setDragOverIndex(index);
-  };
-  const handleDragLeave = () => {
-    setDragOverIndex(null);
-  };
-  const handleDragEnd = () => {
-    setDraggedIndex(null);
-    setDragOverIndex(null);
-  };
+  const handleDragStart = (e, index) => setDraggedIndex(index);
+  const handleDragOver = (e, index) => { e.preventDefault(); setDragOverIndex(index); };
+  const handleDragLeave = () => setDragOverIndex(null);
+  const handleDragEnd = () => { setDraggedIndex(null); setDragOverIndex(null); };
   const handleDrop = (e, targetIndex) => {
     e.preventDefault();
     if (draggedIndex === null) return;
@@ -2595,184 +1807,155 @@ function ImageResizer({ files, onFilesChange, toggleFileBrowser, isFileBrowserCo
 
   const handleRemoveFile = (index) => {
     onFilesChange(prev => prev.filter((_, i) => i !== index));
-    if (activePreviewFile === files[index]) {
-      setActivePreviewFile(null);
+    if (activePreviewFile === files[index]) setActivePreviewFile(null);
+  };
+
+  const handleBrowseDestFolder = () => {
+    if (openFolderPicker) {
+      openFolderPicker(customDestPath, (selectedPath) => {
+        if (selectedPath) {
+          setCustomDestPath(selectedPath);
+          setSaveDestMode('custom');
+          localStorage.setItem('rfine_img_custom_dest_path', selectedPath);
+          localStorage.setItem('rfine_img_save_dest_mode', 'custom');
+        }
+      });
     }
   };
 
-  const handleProcessImages = async () => {
+  const handleConvert = async () => {
     if (files.length === 0) return;
-    setIsProcessing(true);
+    setProcessing(true);
     setSuccessResult(null);
     try {
+      const targetDir = saveDestMode === 'original' ? undefined : saveDestMode === 'default' ? (localStorage.getItem('rfine_def_save_dir') || undefined) : customDestPath || undefined;
       const res = await fetch(`${API_BASE}/image/convert-local`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          files,
-          format,
-          quality,
-          resizeMode,
-          width,
-          height,
-          scalePercent,
-          outputFolder: outputFolder || undefined,
-          watermark: watermarkText || undefined,
-          watermarkPosition,
-          keepMetadata
+          files, format, quality, resizeMode, width, height, scalePercent,
+          proportionateAnchor, proportionateValue,
+          outputFolder: targetDir
         })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to process images');
-      setSuccessResult({ targetFolder: data.targetFolder || outputFolder || '' });
-    } catch (e) {
-      alert('Processing failed: ' + e.message);
-    } finally {
-      setIsProcessing(false);
-    }
+      let lastSavedFolder = data.targetFolder || (files[0] && files[0].path ? files[0].path.substring(0, files[0].path.lastIndexOf('\\')) : '');
+      if (data.results && addRecentProcess) {
+        data.results.forEach(r => {
+          if (r.success) addRecentProcess('Image Resizer', r.name, r.originalSize, r.optimizedSize, r.targetFolder);
+        });
+      }
+      setSuccessResult({ results: data.results, targetFolder: lastSavedFolder, count: files.length });
+
+      if (openOnComplete && lastSavedFolder) {
+        try {
+          await fetch(`${API_BASE}/open-folder`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ folderPath: lastSavedFolder }) });
+        } catch (e) { console.error('Auto-open failed:', e); }
+      }
+    } catch (e) { alert('Processing failed: ' + e.message); }
+    finally { setProcessing(false); }
   };
+
+  const currentSelectedFile = activePreviewFile || files[0];
 
   return (
     <div style={{ display: 'flex', width: '100%', height: '100%', minWidth: 0, position: 'relative' }}>
-      <div className="middle-canvas" style={{ display: 'flex', flexDirection: 'column', height: '100%', minWidth: 0, overflow: 'hidden' }}>
-        <CollapsibleFileBrowser
-          isFileBrowserCollapsed={isFileBrowserCollapsed}
-          toggleFileBrowser={toggleFileBrowser}
-          explorerHeight={explorerHeight}
-          handleDividerMouseDown={handleDividerMouseDown}
-        >
+      <div className="middle-canvas" style={{ display: 'flex', flexDirection: 'column', height: '100%', minWidth: 0, overflowY: 'auto' }}>
+        <CollapsibleFileBrowser isFileBrowserCollapsed={isFileBrowserCollapsed} toggleFileBrowser={toggleFileBrowser} explorerHeight={explorerHeight} handleDividerMouseDown={handleDividerMouseDown}>
           <FileExplorer 
             onAddFiles={(newFiles) => {
               onFilesChange(prev => {
                 const updated = [...prev];
-                newFiles.forEach(f => {
-                  if (!updated.some(x => x.path === f.path)) {
-                    updated.push(f);
-                  }
-                });
+                newFiles.forEach(f => { if (!updated.some(x => x.path === f.path)) updated.push(f); });
                 return updated;
               });
             }}
+            onPreviewFile={(item) => setActivePreviewFile(item)}
             allowedExtensions={['.png', '.jpg', '.jpeg', '.webp', '.avif', '.heic', '.heif']}
             theme={theme}
             defaultPath={localStorage.getItem('rfine_def_image_dir') || undefined}
             storageKey="rfine_last_dir_image"
+            openFolderPicker={openFolderPicker}
             onCollapse={toggleFileBrowser}
           />
         </CollapsibleFileBrowser>
 
+        {/* Processing Queue Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexShrink: 0, marginTop: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-white)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Processing Queue</span>
+            <span style={{ fontSize: '10px', fontWeight: 'bold', background: 'rgba(77, 155, 34, 0.1)', color: 'var(--primary-color)', padding: '2px 8px', borderRadius: '12px' }}>
+              {files.length} {files.length === 1 ? 'item' : 'items'}
+            </span>
+          </div>
+          {files.length > 0 && (
+            <button className="btn-secondary" style={{ padding: '4px 8px', fontSize: '10px', borderColor: 'transparent', background: 'transparent' }} onClick={() => { onFilesChange([]); setActivePreviewFile(null); setSuccessResult(null); }}>
+              Clear All
+            </button>
+          )}
+        </div>
+
+        {/* Success Banner */}
         {successResult && (
-          <div className="animate-fade-in" style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'space-between',
-            padding: '10px 14px', 
-            background: 'rgba(77, 155, 34, 0.08)', 
-            border: '1px solid rgba(77, 155, 34, 0.25)', 
-            borderRadius: '6px', 
-            fontSize: '11px', 
-            color: 'var(--primary-color)', 
-            fontWeight: 'bold',
-            marginBottom: '12px',
-            gap: '12px',
-            flexShrink: 0
-          }}>
+          <div className="animate-fade-in" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'rgba(77, 155, 34, 0.08)', border: '1px solid rgba(77, 155, 34, 0.25)', borderRadius: '6px', fontSize: '11px', color: '#72BC28', fontWeight: 'bold', marginBottom: '12px', gap: '12px', flexShrink: 0 }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <CheckCircle size={14} color="var(--primary-color)" />
-              Successfully processed {successResult.results ? successResult.results.length : 1} images!
+              <CheckCircle size={14} color="#72BC28" />
+              Successfully processed {successResult.count || 1} images!
             </span>
             {successResult.targetFolder && (
-              <button 
-                onClick={async () => {
-                  try {
-                    await fetch(`${API_BASE}/open-folder`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ folderPath: successResult.targetFolder })
-                    });
-                  } catch (e) { console.error(e); }
-                }}
-                className="btn-secondary"
-                style={{ padding: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.05)', borderColor: 'var(--glass-border)', color: 'var(--primary-color)', borderRadius: '4px' }}
-                title="Open Saved Directory"
-              >
+              <button onClick={async () => { try { await fetch(`${API_BASE}/open-folder`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ folderPath: successResult.targetFolder }) }); } catch (e) {} }} className="btn-secondary flex-center" style={{ padding: '4px 10px', gap: '6px', background: 'rgba(0,0,0,0.05)', borderColor: 'var(--glass-border)', color: 'var(--primary-color)', borderRadius: '4px', cursor: 'pointer' }} title="Open Output Folder">
                 <FolderOpen size={14} color="var(--primary-color)" />
+                <span style={{ fontSize: '10.5px' }}>Open Folder</span>
               </button>
             )}
           </div>
         )}
 
-        {/* Selected Files List */}
+        {/* Queue Items Box (Exact layout as Screenshot 1) */}
         {files.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', border: '1px solid var(--glass-border)', borderRadius: '6px', overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.02)', marginBottom: '15px', flexShrink: 0 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', border: '1px solid var(--glass-border)', borderRadius: '8px', overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.02)', marginBottom: '12px', flexShrink: 0 }}>
             {files.map((file, idx) => {
               const fileName = typeof file === 'string' ? path.basename(file) : file.name;
               const filePath = typeof file === 'string' ? file : file.path;
-              const fileSize = typeof file === 'string' ? '' : formatFileSize(file.size);
-              const ext = path.extname(fileName).toUpperCase().replace('.', '');
+              const fileSize = typeof file === 'string' ? 0 : file.size;
+              const ext = (path.extname(fileName) || '').toUpperCase().replace('.', '');
+              const isDragTarget = dragOverIndex === idx;
               return (
                 <div 
                   key={idx} 
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, idx)}
-                  onDragOver={(e) => handleDragOver(e, idx)}
-                  onDragLeave={handleDragLeave}
-                  onDragEnd={handleDragEnd}
-                  onDrop={(e) => handleDrop(e, idx)}
+                  draggable 
+                  onDragStart={(e) => handleDragStart(e, idx)} 
+                  onDragOver={(e) => handleDragOver(e, idx)} 
+                  onDragLeave={handleDragLeave} 
+                  onDragEnd={handleDragEnd} 
+                  onDrop={(e) => handleDrop(e, idx)} 
                   style={{ 
                     display: 'flex', 
                     alignItems: 'center', 
                     justifyContent: 'space-between', 
-                    padding: '8px 12px', 
-                    borderBottom: dragOverIndex === idx && draggedIndex !== null && draggedIndex < idx ? '2px solid var(--secondary-color)' : (idx === files.length - 1 ? 'none' : '1px solid var(--glass-border)'), 
-                    borderTop: dragOverIndex === idx && draggedIndex !== null && draggedIndex > idx ? '2px solid var(--secondary-color)' : 'none',
-                    backgroundColor: activePreviewFile === file ? 'rgba(0,0,0,0.03)' : 'transparent',
-                    cursor: 'grab'
-                  }}
+                    padding: '10px 14px', 
+                    borderBottom: idx === files.length - 1 ? 'none' : '1px solid var(--glass-border)', 
+                    borderTop: isDragTarget ? '3px solid var(--primary-color)' : 'none',
+                    background: isDragTarget ? 'rgba(77, 155, 34, 0.15)' : 'transparent', 
+                    opacity: draggedIndex === idx ? 0.5 : 1, 
+                    transition: 'all 0.15s ease', 
+                    cursor: 'grab' 
+                  }} 
                   onClick={() => setActivePreviewFile(file)}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flexGrow: 1 }}>
-                    <span style={{ cursor: 'grab', color: 'var(--color-slate)', fontSize: '12px' }}>⋮⋮</span>
-                    <div style={{ width: '36px', height: '36px', background: 'rgba(0,0,0,0.05)', border: '1px solid var(--glass-border)', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
-                      <img 
-                        src={`${API_BASE}/image-preview?path=${encodeURIComponent(filePath)}`} 
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                        alt=""
-                        onError={(e) => {
-                          e.target.style.display = 'none'; // Fallback if failed to load
-                        }}
-                      />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flexGrow: 1 }}>
+                    <span style={{ cursor: 'grab', color: 'var(--color-slate)', fontSize: '13px', userSelect: 'none' }}>⋮⋮</span>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '4px', overflow: 'hidden', backgroundColor: 'rgba(0,0,0,0.2)', border: '1px solid var(--glass-border)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <img src={`${API_BASE}/image-preview?path=${encodeURIComponent(filePath)}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }} />
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                       <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-white)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{fileName}</span>
-                      {(() => {
-                        const result = successResult?.results?.find(r => r.name === fileName);
-                        if (result && result.success) {
-                          const pct = Math.round((1 - result.optimizedSize / result.originalSize) * 100);
-                          return (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '10px', marginTop: '2px' }}>
-                              <span style={{ color: 'var(--color-slate)' }}>{ext} • {fileSize}</span>
-                              <span style={{ color: 'var(--color-slate)' }}>&rarr;</span>
-                              <span style={{ color: '#5ABF3A', fontWeight: 'bold' }}>{formatFileSize(result.optimizedSize)}</span>
-                              <span style={{ background: 'rgba(90, 191, 58, 0.15)', color: '#5ABF3A', padding: '1px 6px', borderRadius: '10px', fontWeight: 'bold', fontSize: '9px' }}>
-                                {pct > 0 ? `-${pct}%` : `0%`}
-                              </span>
-                            </div>
-                          );
-                        }
-                        return <span style={{ fontSize: '10px', color: 'var(--color-slate)' }}>{ext} • {fileSize}</span>;
-                      })()}
+                      <span style={{ fontSize: '10px', color: 'var(--color-slate)' }}>{ext} • {formatFileSize(fileSize)}</span>
                     </div>
                   </div>
-                  <button 
-                    style={{ background: 'none', border: 'none', color: 'var(--primary-color)', cursor: 'pointer', display: 'flex', padding: '6px', borderRadius: '4px' }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRemoveFile(idx);
-                    }}
-                    title="Remove file"
-                  >
-                    <Trash2 size={14} color="var(--primary-color)" />
+                  <button style={{ background: 'none', border: 'none', color: 'var(--primary-color)', cursor: 'pointer', padding: '4px' }} onClick={(e) => { e.stopPropagation(); handleRemoveFile(idx); }} title="Remove item">
+                    <Trash2 size={15} color="var(--primary-color)" />
                   </button>
                 </div>
               );
@@ -2780,231 +1963,122 @@ function ImageResizer({ files, onFilesChange, toggleFileBrowser, isFileBrowserCo
           </div>
         )}
 
-        {/* Dashed Drag/Drop Area: Local Dropzone showing overlay only inside this container */}
-        <div 
-          className="dropzone flex-center" 
-          onClick={() => document.getElementById('image-studio-add-file-input').click()}
-          style={{ 
-            padding: '20px', 
-            position: 'relative',
-            overflow: 'hidden'
-          }}
-        >
-          <input 
-            type="file"
-            id="image-studio-add-file-input"
-            multiple
-            accept=".jpg,.jpeg,.png,.webp,.avif,.heic"
-            onChange={(e) => {
-              if (e.target.files) {
-                const newFiles = Array.from(e.target.files).map(file => ({
-                  name: file.name,
-                  path: file.path || file.name,
-                  size: file.size,
-                  type: file.type
-                }));
-                setFiles(prev => {
-                  const existingPaths = new Set(prev.map(f => f.path));
-                  const uniqueNew = newFiles.filter(f => !existingPaths.has(f.path));
-                  return [...prev, ...uniqueNew];
-                });
-              }
-            }}
-            style={{ display: 'none' }}
-          />
-          {isDraggingFile ? (
-            <>
-              <Download size={20} color="var(--primary-color)" className="animate-bounce" style={{ color: 'var(--primary-color)' }} />
-              <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--primary-color)' }}>Drop files here to start refining</span>
-            </>
-          ) : (
-            <>
-              <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-white)' }}>+ Add more files or drag & drop</span>
-              <span style={{ fontSize: '10px', color: 'var(--color-slate)' }}>Supports JPEG, PNG, WEBP, AVIF, HEIC</span>
-            </>
-          )}
+        {/* Dropzone placed at bottom */}
+        <div className="dropzone flex-center" onClick={() => document.getElementById('image-studio-add-file-input').click()} style={{ padding: '20px', position: 'relative', marginTop: 'auto', flexShrink: 0 }}>
+          <input type="file" id="image-studio-add-file-input" multiple accept=".jpg,.jpeg,.png,.webp,.avif,.heic" onChange={(e) => { if (e.target.files) { const newFiles = Array.from(e.target.files).map(file => ({ name: file.name, path: file.path || file.name, size: file.size })); onFilesChange(prev => [...prev, ...newFiles.filter(f => !prev.some(x => x.path === f.path))]); } }} style={{ display: 'none' }} />
+          <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-white)' }}>+ Add more files or drag & drop</span>
+          <span style={{ fontSize: '10px', color: 'var(--color-slate)' }}>Supports JPEG, PNG, WEBP, AVIF, HEIC</span>
         </div>
       </div>
 
-      {/* Right Sidebar: Refinement Settings */}
+      {/* Right Sidebar: Accordion Collapsible Sections */}
       <div className="right-sidebar">
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '0 0 4px 0' }}>
           <Image size={20} color="var(--primary-color)" />
-          <h2 style={{ fontSize: '18px', fontWeight: '800', color: 'var(--primary-color)', margin: 0, textTransform: 'uppercase' }}>Image Resizer</h2>
+          <h2 style={{ fontSize: '18px', fontWeight: '800', color: 'var(--primary-color)', margin: 0 }}>IMAGE RESIZER</h2>
         </div>
-        <p style={{ color: 'var(--color-slate)', fontSize: '11px', margin: '0 0 24px 0', lineHeight: '1.4' }}>Batch resize and convert images.</p>
+        <p style={{ color: 'var(--color-slate)', fontSize: '11px', margin: '0 0 16px 0' }}>Batch resize and convert images.</p>
 
-        {/* Inner Scrollable Settings Container */}
-        <div className="sidebar-settings-content">
-          {/* Selection Preview at top of settings sidebar */}
-          {activePreviewFile && (
-            <div className="animate-fade-in" style={{ padding: '10px', background: 'rgba(0,0,0,0.05)', borderRadius: '6px', marginBottom: '15px', border: '1px solid var(--glass-border)', textAlign: 'center', position: 'relative' }}>
-              {onOpenFullscreenPreview && (
-                <button
-                  onClick={() => onOpenFullscreenPreview(activePreviewFile)}
-                  className="btn-secondary"
-                  style={{ position: 'absolute', top: '6px', right: '6px', padding: '4px', borderRadius: '4px', background: 'rgba(0,0,0,0.5)', border: 'none', cursor: 'pointer', zIndex: 5 }}
-                  title="Open Fullscreen Preview"
-                >
-                  <Maximize2 size={12} color="#FFFFFF" />
-                </button>
-              )}
-              <img 
-                src={`${API_BASE}/image-preview?path=${encodeURIComponent(activePreviewFile.path || activePreviewFile)}`}
-                style={{ maxWidth: '100%', maxHeight: '120px', borderRadius: '4px', objectFit: 'contain' }}
-                alt="Selected preview"
-              />
-              <span style={{ fontSize: '10px', color: 'var(--color-slate)', display: 'block', marginTop: '4px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                {path.basename(activePreviewFile.path || activePreviewFile)}
+        {/* Right Sidebar Preview Box (Matching Screenshot 1) */}
+        {currentSelectedFile && (() => {
+          const fn = typeof currentSelectedFile === 'string' ? path.basename(currentSelectedFile) : currentSelectedFile.name;
+          const fp = typeof currentSelectedFile === 'string' ? currentSelectedFile : currentSelectedFile.path;
+          return (
+            <div className="glass-panel" style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--glass-border)', marginBottom: '16px', position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.15)' }}>
+              <button 
+                onClick={() => onOpenFullscreenPreview && onOpenFullscreenPreview({ name: fn, path: fp })} 
+                className="btn-secondary" 
+                style={{ position: 'absolute', top: '8px', right: '8px', padding: '4px 6px', borderRadius: '4px', background: 'rgba(0,0,0,0.5)', border: '1px solid var(--glass-border)', color: '#FFF', cursor: 'pointer', zIndex: 5 }} 
+                title="Fullscreen Preview"
+              >
+                <Maximize2 size={12} />
+              </button>
+              <div style={{ width: '100%', height: '140px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderRadius: '6px', backgroundColor: 'rgba(0,0,0,0.3)' }}>
+                <img 
+                  src={`${API_BASE}/image-preview?path=${encodeURIComponent(fp)}`} 
+                  alt="" 
+                  style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }} 
+                  onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }}
+                />
+              </div>
+              <span style={{ fontSize: '10.5px', color: 'var(--color-slate)', marginTop: '8px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '100%' }}>
+                {fn}
               </span>
             </div>
-          )}
+          );
+        })()}
 
-          {/* Category 1: Format & Quality */}
-          <div style={{ marginBottom: '12px' }}>
-            <div 
-              onClick={() => setSectionFormatExpanded(!sectionFormatExpanded)}
-              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '6px 0', borderBottom: '1px solid var(--glass-border)', marginBottom: '10px' }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Sliders size={13} color="var(--primary-color)" />
-                <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-white)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Format & Quality</span>
-              </div>
-              <span style={{ fontSize: '10px', color: 'var(--color-slate)' }}>{sectionFormatExpanded ? '▼' : '▶'}</span>
+        <div className="sidebar-settings-content">
+          {/* Section 1: Output Format & Quality */}
+          <div style={{ marginBottom: '16px' }}>
+            <div onClick={() => setSectionConfigExpanded(!sectionConfigExpanded)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '6px 0', borderBottom: '1px solid var(--glass-border)', marginBottom: '10px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-white)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Output Format</span>
+              <span style={{ fontSize: '10px', color: 'var(--color-slate)' }}>{sectionConfigExpanded ? '▼' : '▶'}</span>
             </div>
 
-            {sectionFormatExpanded && (
-              <div className="animate-fade-in" style={{ padding: '2px 0' }}>
-                {/* Formats Presets */}
-                <div style={{ marginBottom: '12px' }}>
-                  <span className="form-label" style={{ fontSize: '10px' }}>Output Format</span>
-                  <div className="clean-preset-grid">
-                    {['jpg', 'png', 'webp', 'avif'].map((fmt) => (
-                      <button
-                        key={fmt}
-                        className={`clean-preset-btn ${format === fmt ? 'active' : ''}`}
-                        onClick={() => setFormat(fmt)}
-                      >
-                        {fmt.toUpperCase()}
-                      </button>
-                    ))}
-                  </div>
+            {sectionConfigExpanded && (
+              <div className="animate-fade-in">
+                <div className="clean-preset-grid" style={{ marginBottom: '12px' }}>
+                  {['jpg', 'png', 'webp', 'avif'].map((fmt) => (
+                    <button key={fmt} className={`clean-preset-btn ${format === fmt ? 'active' : ''}`} onClick={() => setFormat(fmt)}>{fmt.toUpperCase()}</button>
+                  ))}
                 </div>
-
-                {/* Quality Slider */}
-                <div style={{ marginBottom: '8px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                    <span className="form-label" style={{ marginBottom: 0, fontSize: '10px' }}>Quality</span>
-                    <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-white)' }}>{quality}%</span>
-                  </div>
-                  <input 
-                    type="range" 
-                    min="10" 
-                    max="100" 
-                    value={quality} 
-                    onChange={(e) => setQuality(parseInt(e.target.value))} 
-                  />
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', fontSize: '9px', color: 'var(--color-slate)' }}>
-                    <span>Small File</span>
-                    <span>High Fidelity</span>
-                  </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <span className="form-label" style={{ fontSize: '10px' }}>Quality</span>
+                  <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-white)' }}>{quality}%</span>
                 </div>
+                <input type="range" min="10" max="100" value={quality} onChange={(e) => setQuality(parseInt(e.target.value))} />
               </div>
             )}
           </div>
 
-          {/* Category 2: Resize Options */}
-          <div style={{ marginBottom: '12px' }}>
-            <div 
-              onClick={() => setSectionResizeExpanded(!sectionResizeExpanded)}
-              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '6px 0', borderBottom: '1px solid var(--glass-border)', marginBottom: '10px' }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Maximize size={13} color="var(--primary-color)" />
-                <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-white)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Resize Options</span>
-              </div>
+          {/* Section 2: Resize Options (Order: Original Resolution first, Pixels second) */}
+          <div style={{ marginBottom: '16px' }}>
+            <div onClick={() => setSectionResizeExpanded(!sectionResizeExpanded)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '6px 0', borderBottom: '1px solid var(--glass-border)', marginBottom: '10px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-white)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Resize Options</span>
               <span style={{ fontSize: '10px', color: 'var(--color-slate)' }}>{sectionResizeExpanded ? '▼' : '▶'}</span>
             </div>
 
             {sectionResizeExpanded && (
-              <div className="animate-fade-in" style={{ padding: '2px 0' }}>
+              <div className="animate-fade-in">
                 <span className="form-label" style={{ fontSize: '10px' }}>Resize Mode</span>
-                <select 
-                  className="form-input" 
-                  value={resizeMode} 
-                  onChange={(e) => setResizeMode(e.target.value)}
-                  style={{ marginBottom: '10px', padding: '6px 10px', fontSize: '12px' }}
-                >
+                <select className="form-input" value={resizeMode} onChange={(e) => setResizeMode(e.target.value)} style={{ padding: '6px 10px', fontSize: '12px', marginBottom: '8px' }}>
                   <option value="none">Original Resolution</option>
+                  <option value="resolution">Pixels</option>
                   <option value="percentage">Percentage Scale</option>
-                  <option value="resolution">In Pixels</option>
-                  <option value="proportionate">Based on one side (Proportionate)</option>
+                  <option value="proportionate">Proportionate</option>
                 </select>
 
                 {resizeMode === 'percentage' && (
-                  <div style={{ marginBottom: '8px' }}>
-                    <span className="form-label" style={{ fontSize: '9px' }}>Scale Percentage</span>
-                    <input 
-                      type="number" 
-                      className="form-input" 
-                      value={scalePercent} 
-                      onChange={(e) => setScalePercent(parseInt(e.target.value) || 100)} 
-                      style={{ padding: '6px 10px', fontSize: '12px' }}
-                    />
+                  <div>
+                    <span className="form-label" style={{ fontSize: '9px' }}>Scale %</span>
+                    <input type="number" className="form-input" value={scalePercent} onChange={(e) => setScalePercent(e.target.value)} style={{ padding: '6px 10px', fontSize: '12px' }} />
                   </div>
                 )}
-
                 {resizeMode === 'resolution' && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                     <div>
                       <span className="form-label" style={{ fontSize: '9px' }}>Width (px)</span>
-                      <input 
-                        type="number" 
-                        className="form-input" 
-                        value={width} 
-                        onChange={(e) => setWidth(e.target.value)} 
-                        placeholder="Width"
-                        style={{ padding: '6px 10px', fontSize: '12px' }}
-                      />
+                      <input type="number" className="form-input" value={width} onChange={(e) => setWidth(e.target.value)} placeholder="Auto" style={{ padding: '6px 10px', fontSize: '12px' }} />
                     </div>
                     <div>
                       <span className="form-label" style={{ fontSize: '9px' }}>Height (px)</span>
-                      <input 
-                        type="number" 
-                        className="form-input" 
-                        value={height} 
-                        onChange={(e) => setHeight(e.target.value)} 
-                        placeholder="Height"
-                        style={{ padding: '6px 10px', fontSize: '12px' }}
-                      />
+                      <input type="number" className="form-input" value={height} onChange={(e) => setHeight(e.target.value)} placeholder="Auto" style={{ padding: '6px 10px', fontSize: '12px' }} />
                     </div>
                   </div>
                 )}
-
                 {resizeMode === 'proportionate' && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '8px', marginBottom: '8px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                     <div>
-                      <span className="form-label" style={{ fontSize: '9px' }}>Anchor Side</span>
-                      <select 
-                        className="form-input" 
-                        value={proportionateAnchor} 
-                        onChange={(e) => setProportionateAnchor(e.target.value)}
-                        style={{ padding: '6px 10px', fontSize: '12px' }}
-                      >
+                      <span className="form-label" style={{ fontSize: '9px' }}>Anchor</span>
+                      <select className="form-input" value={proportionateAnchor} onChange={(e) => setProportionateAnchor(e.target.value)} style={{ padding: '6px 10px', fontSize: '12px' }}>
                         <option value="width">Width</option>
                         <option value="height">Height</option>
                       </select>
                     </div>
                     <div>
-                      <span className="form-label" style={{ fontSize: '9px' }}>Dimension (px)</span>
-                      <input 
-                        type="number" 
-                        className="form-input" 
-                        value={proportionateValue} 
-                        onChange={(e) => setProportionateValue(e.target.value)} 
-                        placeholder="e.g. 1920"
-                        style={{ padding: '6px 10px', fontSize: '12px' }}
-                      />
+                      <span className="form-label" style={{ fontSize: '9px' }}>Value (px)</span>
+                      <input type="number" className="form-input" value={proportionateValue} onChange={(e) => setProportionateValue(e.target.value)} style={{ padding: '6px 10px', fontSize: '12px' }} />
                     </div>
                   </div>
                 )}
@@ -3012,81 +2086,36 @@ function ImageResizer({ files, onFilesChange, toggleFileBrowser, isFileBrowserCo
             )}
           </div>
 
-          {/* Category 3: Save Destination */}
-          <div style={{ marginBottom: '20px' }}>
-            <div 
-              onClick={() => setSectionSaveExpanded(!sectionSaveExpanded)}
-              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '6px 0', borderBottom: '1px solid var(--glass-border)', marginBottom: '10px' }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <FolderOpen size={13} color="var(--primary-color)" />
-                <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-white)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Save Destination</span>
-              </div>
+          {/* Section 3: Target Directory (Custom Button Folder Picker Working) */}
+          <div style={{ marginBottom: '16px' }}>
+            <div onClick={() => setSectionSaveExpanded(!sectionSaveExpanded)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '6px 0', borderBottom: '1px solid var(--glass-border)', marginBottom: '10px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-white)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Save Destination</span>
               <span style={{ fontSize: '10px', color: 'var(--color-slate)' }}>{sectionSaveExpanded ? '▼' : '▶'}</span>
             </div>
 
             {sectionSaveExpanded && (
-              <div className="animate-fade-in" style={{ padding: '2px 0' }}>
-                <span className="form-label" style={{ fontSize: '10px' }}>Target Directory</span>
+              <div className="animate-fade-in">
                 <div className="clean-preset-grid" style={{ gridTemplateColumns: '1fr 1fr 1.2fr' }}>
-                  <button
-                    className={`clean-preset-btn ${saveDestMode === 'original' ? 'active' : ''}`}
-                    onClick={() => setSaveDestMode('original')}
-                    style={{ padding: '6px 4px', fontSize: '9.5px' }}
-                  >
-                    Original
-                  </button>
-                  <button
-                    className={`clean-preset-btn ${saveDestMode === 'default' ? 'active' : ''}`}
-                    onClick={() => setSaveDestMode('default')}
-                    style={{ padding: '6px 4px', fontSize: '9.5px' }}
-                  >
-                    Default
-                  </button>
-                  <button
-                    className={`clean-preset-btn ${saveDestMode === 'custom' ? 'active' : ''}`}
-                    onClick={handleBrowseDestFolder}
-                    style={{ padding: '6px 4px', fontSize: '9.5px' }}
-                  >
-                    Custom...
-                  </button>
+                  <button className={`clean-preset-btn ${saveDestMode === 'original' ? 'active' : ''}`} onClick={() => setSaveDestMode('original')} style={{ padding: '6px 4px', fontSize: '9.5px' }}>Original</button>
+                  <button className={`clean-preset-btn ${saveDestMode === 'default' ? 'active' : ''}`} onClick={() => setSaveDestMode('default')} style={{ padding: '6px 4px', fontSize: '9.5px' }}>Default</button>
+                  <button className={`clean-preset-btn ${saveDestMode === 'custom' ? 'active' : ''}`} onClick={() => { setSaveDestMode('custom'); handleBrowseDestFolder(); }} style={{ padding: '6px 4px', fontSize: '9.5px' }}>Custom...</button>
                 </div>
-                <span style={{ fontSize: '9px', color: 'var(--color-slate)', fontStyle: 'italic', display: 'block', marginTop: '4px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={
-                  saveDestMode === 'original' ? 'Original file directory' :
-                  saveDestMode === 'default' ? (localStorage.getItem('rfine_def_save_dir') || 'Default folder not set') :
-                  customDestPath || 'No folder selected'
-                }>
-                  Saving to: {
-                    saveDestMode === 'original' ? 'Original Folder' :
-                    saveDestMode === 'default' ? (localStorage.getItem('rfine_def_save_dir') || 'Default not set') :
-                    customDestPath ? path.basename(customDestPath) : 'Not configured'
-                  }
-                </span>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
-                  <input 
-                    type="checkbox" 
-                    id="chk-img-open-folder"
-                    checked={openOnComplete}
-                    onChange={(e) => setOpenOnComplete(e.target.checked)}
-                  />
-                  <label htmlFor="chk-img-open-folder" style={{ fontSize: '11px', color: 'var(--color-white)', cursor: 'pointer' }}>
-                    Auto-Open Output Directory
-                  </label>
+                {saveDestMode === 'custom' && customDestPath && (
+                  <div style={{ fontSize: '10px', color: 'var(--primary-color)', marginTop: '6px', wordBreak: 'break-all' }}>
+                    Path: {customDestPath}
+                  </div>
+                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px' }}>
+                  <input type="checkbox" id="chk-img-open-folder" checked={openOnComplete} onChange={(e) => setOpenOnComplete(e.target.checked)} />
+                  <label htmlFor="chk-img-open-folder" style={{ fontSize: '11px', color: 'var(--color-white)', cursor: 'pointer' }}>Auto-Open Output Directory</label>
                 </div>
               </div>
             )}
           </div>
         </div>
 
-        {/* Sticky Pinned Button Container */}
         <div style={{ paddingTop: '15px', borderTop: '1px solid var(--glass-border)', flexShrink: 0 }}>
-          <button 
-            className="process-action-btn flex-center"
-            onClick={handleConvert}
-            disabled={processing || files.length === 0}
-            style={{ width: '100%', color: '#FFFFFF', justifyContent: 'center', gap: '6px' }}
-          >
+          <button className="process-action-btn flex-center" onClick={handleConvert} disabled={processing || files.length === 0} style={{ width: '100%', color: '#FFFFFF', justifyContent: 'center', gap: '6px' }}>
             <Zap size={14} color="#FFFFFF" fill="#FFFFFF" />
             <span style={{ color: '#FFFFFF' }}>{processing ? 'PROCESSING...' : 'PROCESS SELECTED'}</span>
           </button>
@@ -3096,8 +2125,7 @@ function ImageResizer({ files, onFilesChange, toggleFileBrowser, isFileBrowserCo
   );
 }
 
-// ----------------------------------------------------------------------------
-// WATERMARK STUDIO MODULE (STANDALONE 5TH TAB)
+
 // ----------------------------------------------------------------------------
 function WatermarkerStudio({ files, setFiles, setGlobalProgress, explorerPreviewFile, setExplorerPreviewFile, theme, openFolderPicker, isDraggingFile, explorerHeight, setExplorerHeight, addRecentProcess, onOpenFullscreenPreview, isFileBrowserCollapsed, toggleFileBrowser }) {
   const [watermark, setWatermark] = useState(() => localStorage.getItem('rfine_wm_watermark') || ''); // base64 DataURL of watermark image
@@ -4012,34 +3040,13 @@ function VideoCompressor({ files, setFiles, setGlobalProgress, theme, openFolder
     return val === null ? true : val === 'true';
   });
 
-  const [sectionFormatExpanded, setSectionFormatExpanded] = useState(true);
-  const [sectionScaleExpanded, setSectionScaleExpanded] = useState(true);
-  const [sectionSaveExpanded, setSectionSaveExpanded] = useState(true);
-  
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
 
-  const handleDragStart = (e, idx) => {
-    e.dataTransfer.effectAllowed = 'move';
-    setDraggedIndex(idx);
-    window.isDraggingQueueItem = true;
-  };
-
-  const handleDragOver = (e, idx) => {
-    e.preventDefault();
-    setDragOverIndex(idx);
-  };
-
-  const handleDragLeave = () => {
-    setDragOverIndex(null);
-  };
-
-  const handleDragEnd = () => {
-    setDraggedIndex(null);
-    setDragOverIndex(null);
-    window.isDraggingQueueItem = false;
-  };
-
+  const handleDragStart = (e, idx) => setDraggedIndex(idx);
+  const handleDragOver = (e, idx) => { e.preventDefault(); setDragOverIndex(idx); };
+  const handleDragLeave = () => setDragOverIndex(null);
+  const handleDragEnd = () => { setDraggedIndex(null); setDragOverIndex(null); };
   const handleDrop = (e, idx) => {
     e.preventDefault();
     if (draggedIndex === null) return;
@@ -4049,10 +3056,7 @@ function VideoCompressor({ files, setFiles, setGlobalProgress, theme, openFolder
     setFiles(reordered);
     setDraggedIndex(null);
     setDragOverIndex(null);
-    window.isDraggingQueueItem = false;
   };
-
-
 
   const handleDividerMouseDown = (e) => {
     e.preventDefault();
@@ -4071,53 +3075,24 @@ function VideoCompressor({ files, setFiles, setGlobalProgress, theme, openFolder
     document.addEventListener('mouseup', onMouseUp);
   };
 
-  useEffect(() => { localStorage.setItem('rfine_vid_format', format); }, [format]);
-  useEffect(() => { localStorage.setItem('rfine_vid_qualitypercent', qualityPercent); }, [qualityPercent]);
-  useEffect(() => { localStorage.setItem('rfine_vid_scale', scale); }, [scale]);
-  useEffect(() => { localStorage.setItem('rfine_vid_muteaudio', muteAudio); }, [muteAudio]);
-  useEffect(() => { localStorage.setItem('rfine_vid_open_on_complete', openOnComplete); }, [openOnComplete]);
-  useEffect(() => { localStorage.setItem('rfine_vid_save_dest_mode', saveDestMode); }, [saveDestMode]);
-  useEffect(() => { localStorage.setItem('rfine_vid_custom_dest_path', customDestPath); }, [customDestPath]);
-
   const handleBrowseDestFolder = () => {
-    openFolderPicker(customDestPath, (selectedPath) => {
-      setCustomDestPath(selectedPath);
-      setSaveDestMode('custom');
-    });
-  }; 
+    if (openFolderPicker) {
+      openFolderPicker(customDestPath, (selectedPath) => {
+        setCustomDestPath(selectedPath);
+        setSaveDestMode('custom');
+      });
+    }
+  };
 
   const handleAddVideo = (selected) => {
-    const formatted = selected.map(f => {
-      if (typeof f === 'string') {
-        return { path: f, name: path.basename(f), size: 0 };
-      }
-      return f;
-    });
-    setFiles(prev => {
-      const updated = [...prev];
-      formatted.forEach(item => {
-        if (!updated.some(x => x.path === item.path)) {
-          updated.push(item);
-        }
-      });
-      if (!activePreviewFile && updated.length > 0) {
-        setActivePreviewFile(updated[0]);
-      }
-      return updated;
-    });
-    setStatusMsg('');
-    setSuccessResult(null);
+    const formatted = selected.map(f => typeof f === 'string' ? { path: f, name: path.basename(f), size: 0 } : f);
+    setFiles(prev => [...prev, ...formatted.filter(item => !prev.some(x => x.path === item.path))]);
   };
 
   const handleCompress = async () => {
-    if (files.length === 0) {
-      alert('Please select files to compress first!');
-      return;
-    }
+    if (files.length === 0) return;
     setCompressing(true);
     setSuccessResult(null);
-    setStatusMsg('Compressing offline...');
-
     const mappedCrf = Math.round(35 - ((qualityPercent - 10) / 90) * 17);
     let lastSavedFolder = '';
     const results = [];
@@ -4125,96 +3100,38 @@ function VideoCompressor({ files, setFiles, setGlobalProgress, theme, openFolder
     try {
       for (let i = 0; i < files.length; i++) {
         const currentFile = files[i];
-        setGlobalProgress({ 
-          active: true, 
-          percent: Math.round((i / files.length) * 100), 
-          label: `Compressing video ${i + 1}/${files.length}: ${currentFile.name}...` 
-        });
+        setGlobalProgress({ active: true, percent: Math.round((i / files.length) * 100), label: `Compressing ${i + 1}/${files.length}: ${currentFile.name}...` });
 
-        const targetDir = 
-          saveDestMode === 'original' ? undefined :
-          saveDestMode === 'default' ? (getDefaultOutputPath('rfine_def_video_dir') || undefined) :
-          customDestPath || undefined;
+        const targetDir = saveDestMode === 'original' ? undefined : saveDestMode === 'default' ? (localStorage.getItem('rfine_def_save_dir') || undefined) : customDestPath || undefined;
 
         const res = await fetch(`${API_BASE}/video/compress-local`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            localPath: currentFile.path,
-            format,
-            crf: mappedCrf,
-            scale,
-            outputFolder: targetDir,
-            muteAudio 
-          })
+          body: JSON.stringify({ localPath: currentFile.path, format, crf: mappedCrf, scale, outputFolder: targetDir, muteAudio })
         });
-
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to start compression');
-        lastSavedFolder = data.targetFolder || currentFile.path.substring(0, currentFile.path.lastIndexOf('\\'));
-        
-        results.push({
-          name: currentFile.name,
-          success: true,
-          originalSize: currentFile.size,
-          optimizedSize: data.optimizedSize || 0
-        });
-
-        if (addRecentProcess) {
-          addRecentProcess(
-            'Video Compressor',
-            currentFile.name,
-            currentFile.size,
-            data.optimizedSize || null,
-            lastSavedFolder
-          );
-        }
+        lastSavedFolder = data.targetFolder || '';
+        results.push({ name: currentFile.name, success: true, originalSize: currentFile.size, optimizedSize: data.optimizedSize || 0 });
+        if (addRecentProcess) addRecentProcess('Video Compressor', currentFile.name, currentFile.size, data.optimizedSize || null, lastSavedFolder);
       }
-
-      setGlobalProgress({ active: true, percent: 100, label: 'All video compression tasks finished!' });
-      setTimeout(() => setGlobalProgress({ active: false, percent: 0, label: '' }), 3000);
-      
       setSuccessResult({ targetFolder: lastSavedFolder, count: files.length, results });
-      setStatusMsg(`Compression completed!`);
-
       if (openOnComplete && lastSavedFolder) {
         try {
-          await fetch(`${API_BASE}/open-folder`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ folderPath: lastSavedFolder })
-          });
-        } catch (e) {
-          console.error(e);
-        }
+          await fetch(`${API_BASE}/open-folder`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ folderPath: lastSavedFolder }) });
+        } catch (e) {}
       }
-    } catch (err) {
-      setGlobalProgress({ active: false, percent: 0, label: '' });
-      setStatusMsg(`Error: ${err.message}`);
-    } finally {
-      setCompressing(false);
-    }
+    } catch (err) { alert('Compression error: ' + err.message); }
+    finally { setCompressing(false); setGlobalProgress({ active: false, percent: 0, label: '' }); }
   };
 
   return (
-    <div className="workspace-layout">
-      {/* Middle Canvas: File Explorer + Processing Queue */}
-      <div className="middle-canvas">
-        <CollapsibleFileBrowser
-          isFileBrowserCollapsed={isFileBrowserCollapsed}
-          toggleFileBrowser={toggleFileBrowser}
-          explorerHeight={explorerHeight}
-          handleDividerMouseDown={handleDividerMouseDown}
-        >
+    <div style={{ display: 'flex', width: '100%', height: '100%', minWidth: 0, position: 'relative' }}>
+      <div className="middle-canvas" style={{ display: 'flex', flexDirection: 'column', height: '100%', minWidth: 0, overflow: 'hidden' }}>
+        <CollapsibleFileBrowser isFileBrowserCollapsed={isFileBrowserCollapsed} toggleFileBrowser={toggleFileBrowser} explorerHeight={explorerHeight} handleDividerMouseDown={handleDividerMouseDown}>
           <FileExplorer 
             onAddFiles={handleAddVideo} 
-            allowedExtensions={['.mp4', '.webm', '.mkv', '.mov']} 
-            maxListHeight={null} 
-            onPreviewFile={(f) => {
-              const fileObj = typeof f === 'string' ? { path: f, name: path.basename(f), size: 0 } : f;
-              handleAddVideo([fileObj]);
-              setActivePreviewFile(fileObj);
-            }}
+            allowedExtensions={['.mp4', '.webm', '.mkv', '.mov']}
             theme={theme}
             defaultPath={localStorage.getItem('rfine_def_video_dir') || undefined}
             storageKey="rfine_last_dir_video"
@@ -4223,413 +3140,94 @@ function VideoCompressor({ files, setFiles, setGlobalProgress, theme, openFolder
           />
         </CollapsibleFileBrowser>
 
-        {/* Processing Queue Title */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-white)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Processing Queue</span>
-            <span style={{ fontSize: '10px', fontWeight: 'bold', background: 'rgba(77, 155, 34, 0.1)', color: 'var(--primary-color)', padding: '2px 8px', borderRadius: '12px' }}>
-              {files.length} {files.length === 1 ? 'item' : 'items'}
-            </span>
-          </div>
-          <button 
-            className="btn-secondary" 
-            style={{ padding: '4px 8px', fontSize: '10px', borderColor: 'transparent', background: 'transparent' }} 
-            onClick={() => {
-              setFiles([]);
-              setActivePreviewFile(null);
-              setSuccessResult(null);
-            }}
-          >
-            Clear All
-          </button>
-        </div>
-
-        {successResult && (
-          <div className="animate-fade-in" style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'space-between',
-            padding: '10px 14px', 
-            background: 'rgba(77, 155, 34, 0.08)', 
-            border: '1px solid rgba(77, 155, 34, 0.25)', 
-            borderRadius: '6px', 
-            fontSize: '11px', 
-            color: '#72BC28', 
-            fontWeight: 'bold',
-            marginBottom: '12px',
-            gap: '12px',
-            flexShrink: 0
-          }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <CheckCircle size={14} color="#72BC28" />
-              Successfully compressed {successResult.count || 1} video files!
-            </span>
-            {successResult.savedDir && (
-              <button 
-                onClick={async () => {
-                  try {
-                    await fetch(`${API_BASE}/open-folder`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ folderPath: successResult.targetFolder })
-                    });
-                  } catch (e) { console.error(e); }
-                }}
-                className="btn-secondary"
-                style={{ padding: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.05)', borderColor: 'var(--glass-border)', color: 'var(--primary-color)', borderRadius: '4px' }}
-                title="Open Saved Directory"
-              >
-                <FolderOpen size={14} color="var(--primary-color)" />
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* Main Workspace Video Player */}
-        {videoSrc ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', flexShrink: 0, marginTop: '12px' }}>
-            {/* Video Scrubber & Playback */}
-            <div style={{ 
-              display: 'flex',
-              flexDirection: 'column', 
-              padding: '16px', 
-              background: 'transparent',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexGrow: 1,
-              minHeight: 0
-            }}>
-              <video 
-                ref={videoRef}
-                src={videoSrc}
-                crossOrigin="anonymous"
-                onPlay={() => setIsPlaying(true)}
-                onPause={() => setIsPlaying(false)}
-                onLoadedMetadata={(e) => setDuration(e.target.duration)}
-                onTimeUpdate={(e) => setCurrentTime(e.target.currentTime)}
-                onClick={() => {
-                  if (videoRef.current) {
-                    if (videoRef.current.paused) videoRef.current.play();
-                    else videoRef.current.pause();
-                  }
-                }}
-                style={{ width: '100%', maxHeight: '220px', borderRadius: '8px', border: '1px solid var(--glass-border)', objectFit: 'contain', cursor: 'pointer' }}
-              />
-
-              <div style={{ width: '100%', marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <input 
-                  type="range"
-                  min="0"
-                  max={duration || 100}
-                  step="0.04"
-                  value={currentTime}
-                  onChange={(e) => {
-                    const val = parseFloat(e.target.value);
-                    setCurrentTime(val);
-                    if (videoRef.current) {
-                      videoRef.current.currentTime = val;
-                    }
-                  }}
-                  style={{ width: '100%', accentColor: 'var(--primary-color)', cursor: 'pointer' }}
-                />
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                  <button
-                    onClick={() => {
-                      if (videoRef.current) {
-                        if (videoRef.current.paused) videoRef.current.play();
-                        else videoRef.current.pause();
-                      }
-                    }}
-                    className="btn-secondary"
-                    style={{ padding: '6px 12px', fontSize: '11px', height: '32px' }}
-                  >
-                    {isPlaying ? <Pause size={14} /> : <Play size={14} />}
-                  </button>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '10.5px', color: 'var(--color-slate)' }}>{formatTime(currentTime)}</span>
-                    <span style={{ 
-                      background: 'var(--primary-color)', 
-                      color: '#FFF', 
-                      padding: '2px 6px', 
-                      borderRadius: '8px', 
-                      fontSize: '10px',
-                      fontWeight: 'bold' 
-                    }}>
-                      {formatTimeWithFrames(currentTime)}
-                    </span>
-                    <span style={{ fontSize: '10.5px', color: 'var(--color-slate)' }}>{formatTime(duration)}</span>
+        {files.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', border: '1px solid var(--glass-border)', borderRadius: '6px', overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.02)', marginBottom: '15px', flexShrink: 0 }}>
+            {files.map((file, idx) => {
+              const fileName = typeof file === 'string' ? path.basename(file) : file.name;
+              const fileSize = typeof file === 'string' ? '' : formatFileSize(file.size);
+              const ext = path.extname(fileName).toUpperCase().replace('.', '');
+              return (
+                <div key={idx} draggable onDragStart={(e) => handleDragStart(e, idx)} onDragOver={(e) => handleDragOver(e, idx)} onDragLeave={handleDragLeave} onDragEnd={handleDragEnd} onDrop={(e) => handleDrop(e, idx)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderBottom: idx === files.length - 1 ? 'none' : '1px solid var(--glass-border)', cursor: 'grab' }} onClick={() => setActivePreviewFile(file)}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flexGrow: 1 }}>
+                    <span style={{ cursor: 'grab', color: 'var(--color-slate)', fontSize: '12px' }}>⋮⋮</span>
+                    <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-white)' }}>{fileName} ({ext} • {fileSize})</span>
                   </div>
+                  <button style={{ background: 'none', border: 'none', color: 'var(--primary-color)', cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setFiles(prev => prev.filter((_, i) => i !== idx)); }}><Trash2 size={14} color="var(--primary-color)" /></button>
                 </div>
-              </div>
-
-              {/* Camera Trigger */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '5px' }}>
-                <button 
-                  onClick={handleCaptureFrame}
-                  className="flex-center"
-                  style={{ 
-                    width: '50px', 
-                    height: '50px', 
-                    borderRadius: '50%', 
-                    padding: 0,
-                    boxShadow: '0 4px 15px rgba(77, 155, 34, 0.2)',
-                    background: 'var(--primary-gradient)',
-                    border: 'none',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                  title="Capture Current Frame"
-                >
-                  <Camera size={20} color="#FFF" />
-                </button>
-                <span style={{ fontSize: '8px', color: 'var(--color-slate)', marginTop: '6px', fontWeight: 'bold', letterSpacing: '1px' }}>
-                  CAPTURE FRAME STILL
-                </span>
-              </div>
-            </div>
-
-          </div>
-        ) : (
-          <div 
-            className="dropzone flex-center" 
-            onClick={() => document.getElementById('frame-extractor-add-file-input').click()}
-            style={{ padding: '40px', flexGrow: 1 }}
-          >
-            <input 
-              type="file"
-              id="frame-extractor-add-file-input"
-              accept=".mp4,.webm,.mkv,.mov"
-              onChange={(e) => {
-                if (e.target.files && e.target.files[0]) {
-                  setFile(e.target.files[0].path || e.target.files[0].name);
-                }
-              }}
-              style={{ display: 'none' }}
-            />
-            <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-white)' }}>Select a video file to capture stills</span>
-            <span style={{ fontSize: '10px', color: 'var(--color-slate)' }}>Supports MP4, WebM, MKV, MOV</span>
+              );
+            })}
           </div>
         )}
+
+        <div className="dropzone flex-center" onClick={() => document.getElementById('vid-compress-add-file-input').click()} style={{ padding: '20px', position: 'relative' }}>
+          <input type="file" id="vid-compress-add-file-input" multiple accept=".mp4,.webm,.mkv,.mov" onChange={(e) => { if (e.target.files) handleAddVideo(Array.from(e.target.files).map(f => ({ name: f.name, path: f.path || f.name, size: f.size }))); }} style={{ display: 'none' }} />
+          <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-white)' }}>+ Add video files or drag & drop</span>
+        </div>
       </div>
 
-      {/* Right Sidebar: Refinement Settings */}
       <div className="right-sidebar">
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '0 0 4px 0' }}>
-          <Camera size={20} color="var(--primary-color)" />
-          <h2 style={{ fontSize: '18px', fontWeight: '800', color: 'var(--primary-color)', margin: 0, textTransform: 'uppercase' }}>Frame Extractor</h2>
+          <Video size={20} color="var(--primary-color)" />
+          <h2 style={{ fontSize: '18px', fontWeight: '800', color: 'var(--primary-color)', margin: 0 }}>VIDEO COMPRESSOR</h2>
         </div>
-        <p style={{ color: 'var(--color-slate)', fontSize: '11px', margin: '0 0 24px 0', lineHeight: '1.4' }}>Extract high-quality frames.</p>
+        <p style={{ color: 'var(--color-slate)', fontSize: '11px', margin: '0 0 24px 0' }}>Batch compress and resize video files.</p>
 
-        {/* Inner Scrollable Settings Container */}
         <div className="sidebar-settings-content">
-          {/* Active Still Preview & Checker */}
-          {activeStill && (
-            <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
-              <div style={{ padding: '0', background: 'rgba(0,0,0,0.05)', borderRadius: '6px', border: '1px solid var(--glass-border)', overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
-                {onOpenFullscreenPreview && (
-                  <button
-                    onClick={() => onOpenFullscreenPreview({ ...activeStill, name: activeStill.name || `frame_${activeStill.timestamp}.png` })}
-                    className="btn-secondary"
-                    style={{ position: 'absolute', top: '6px', right: '6px', padding: '4px', borderRadius: '4px', background: 'rgba(0,0,0,0.5)', border: 'none', cursor: 'pointer', zIndex: 5 }}
-                    title="Open Fullscreen Preview"
-                  >
-                    <Maximize2 size={12} color="#FFFFFF" />
-                  </button>
-                )}
-                <img 
-                  src={activeStill.dataUrl} 
-                  style={{ width: '100%', maxHeight: '180px', objectFit: 'contain' }} 
-                  alt="Selected still" 
-                />
-              </div>
+          <div style={{ marginBottom: '16px' }}>
+            <span className="form-label" style={{ fontSize: '10px' }}>Target Quality: {qualityPercent}%</span>
+            <input type="range" min="10" max="100" value={qualityPercent} onChange={(e) => setQualityPercent(parseInt(e.target.value))} />
+          </div>
 
-              {/* Checkbox wrapper */}
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--color-light-gray)', justifyContent: 'center', margin: '4px 0', cursor: 'pointer' }}>
-                <input 
-                  type="checkbox" 
-                  checked={activeStill.selected} 
-                  onChange={() => toggleSelectStill(activeStill.id)} 
-                  style={{ width: '13px', height: '13px', cursor: 'pointer' }}
-                />
-                <span>Include in Export ({activeStill.timestamp})</span>
-              </label>
+          <div style={{ marginBottom: '16px' }}>
+            <span className="form-label" style={{ fontSize: '10px' }}>Resolution</span>
+            <select className="form-input" value={scale} onChange={(e) => setScale(e.target.value)} style={{ padding: '6px 10px', fontSize: '12px' }}>
+              <option value="none">Original Resolution</option>
+              <option value="?x1080">1080p FHD</option>
+              <option value="?x720">720p HD</option>
+              <option value="?x480">480p SD</option>
+            </select>
+          </div>
 
-              {/* Single Download button */}
-              <button 
-                onClick={() => handleSaveStillLocally(activeStill)} 
-                className="btn-secondary flex-center"
-                style={{ width: '100%', padding: '6px 0', borderRadius: '4px' }}
-                title="Save current still to disk"
-              >
-                <Download size={13} color="var(--primary-color)" />
-              </button>
+          <div style={{ marginBottom: '16px' }}>
+            <span className="form-label" style={{ fontSize: '10px' }}>Output Format</span>
+            <div className="clean-preset-grid">
+              {['mp4', 'webm', 'mkv'].map(fmt => (
+                <button key={fmt} className={`clean-preset-btn ${format === fmt ? 'active' : ''}`} onClick={() => setFormat(fmt)}>{fmt.toUpperCase()}</button>
+              ))}
             </div>
-          )}
+          </div>
 
-          {/* Captured Stills Grid */}
-          {gallery.length > 0 && (
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '8px 0 10px 0', borderTop: '1px solid var(--glass-border)', paddingTop: '16px' }}>
-                <Camera size={13} color="var(--primary-color)" />
-                <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-white)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  Captured Stills ({gallery.length})
-                </span>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', maxHeight: '180px', overflowY: 'auto', paddingRight: '4px' }}>
-                {gallery.map(still => (
-                  <div 
-                    key={still.id}
-                    onClick={() => setActiveStill(still)}
-                    style={{
-                      position: 'relative',
-                      aspectRatio: '16/9',
-                      borderRadius: '4px',
-                      border: activeStill && activeStill.id === still.id ? '2px solid var(--primary-color)' : '1px solid var(--glass-border)',
-                      overflow: 'hidden',
-                      cursor: 'pointer',
-                      background: '#000',
-                      opacity: still.selected ? 1 : 0.5,
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    <img src={still.dataUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
-                    {/* Clickable Selection Circle Badge */}
-                    <div 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleSelectStill(still.id);
-                      }}
-                      style={{ 
-                        position: 'absolute', 
-                        top: '3px', 
-                        left: '3px', 
-                        background: still.selected ? 'var(--primary-color)' : 'rgba(0,0,0,0.5)', 
-                        border: '1.5px solid rgba(255,255,255,0.4)',
-                        borderRadius: '50%', 
-                        width: '18px', 
-                        height: '18px', 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center',
-                        zIndex: 10,
-                        cursor: 'pointer',
-                        boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
-                        transition: 'all 0.15s ease'
-                      }}
-                      title={still.selected ? "Deselect still" : "Select still"}
-                    >
-                      {still.selected && <Check size={11} color="#FFF" style={{ strokeWidth: 3 }} />}
-                    </div>
-                    <div style={{ position: 'absolute', bottom: '2px', left: '2px', right: '2px', background: 'rgba(0,0,0,0.6)', color: '#FFF', fontSize: '7.5px', textAlign: 'center', borderRadius: '2px', padding: '1px 0' }}>
-                      {still.timestamp}
-                    </div>
-                  </div>
-                ))}
-              </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+            <input type="checkbox" id="chk-mute" checked={muteAudio} onChange={(e) => setMuteAudio(e.target.checked)} />
+            <label htmlFor="chk-mute" style={{ fontSize: '11px', color: 'var(--color-white)', cursor: 'pointer' }}>Mute Audio Track</label>
+          </div>
+
+          <div style={{ marginBottom: '16px' }}>
+            <span className="form-label" style={{ fontSize: '10px' }}>Target Directory</span>
+            <div className="clean-preset-grid" style={{ gridTemplateColumns: '1fr 1fr 1.2fr' }}>
+              <button className={`clean-preset-btn ${saveDestMode === 'original' ? 'active' : ''}`} onClick={() => setSaveDestMode('original')} style={{ padding: '6px 4px', fontSize: '9.5px' }}>Original</button>
+              <button className={`clean-preset-btn ${saveDestMode === 'default' ? 'active' : ''}`} onClick={() => setSaveDestMode('default')} style={{ padding: '6px 4px', fontSize: '9.5px' }}>Default</button>
+              <button className={`clean-preset-btn ${saveDestMode === 'custom' ? 'active' : ''}`} onClick={handleBrowseDestFolder} style={{ padding: '6px 4px', fontSize: '9.5px' }}>Custom...</button>
             </div>
-          )}
-
-
-
-          {/* Category 2: Save Destination */}
-          <div style={{ marginBottom: '20px' }}>
-            <div 
-              onClick={() => setSectionSaveExpanded(!sectionSaveExpanded)}
-              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '6px 0', borderBottom: '1px solid var(--glass-border)', marginBottom: '10px' }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <FolderOpen size={13} color="var(--primary-color)" />
-                <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-white)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Save Destination</span>
-              </div>
-              <span style={{ fontSize: '10px', color: 'var(--color-slate)' }}>{sectionSaveExpanded ? '▼' : '▶'}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px' }}>
+              <input type="checkbox" id="chk-vid-open" checked={openOnComplete} onChange={(e) => setOpenOnComplete(e.target.checked)} />
+              <label htmlFor="chk-vid-open" style={{ fontSize: '11px', color: 'var(--color-white)', cursor: 'pointer' }}>Auto-Open Output Directory</label>
             </div>
-
-            {sectionSaveExpanded && (
-              <div className="animate-fade-in" style={{ padding: '2px 0' }}>
-                <span className="form-label" style={{ fontSize: '10px' }}>Target Directory</span>
-                <div className="clean-preset-grid" style={{ gridTemplateColumns: '1fr 1fr 1.2fr' }}>
-                  <button
-                    className={`clean-preset-btn ${saveDestMode === 'original' ? 'active' : ''}`}
-                    onClick={() => setSaveDestMode('original')}
-                    style={{ padding: '6px 4px', fontSize: '9.5px' }}
-                  >
-                    Original
-                  </button>
-                  <button
-                    className={`clean-preset-btn ${saveDestMode === 'default' ? 'active' : ''}`}
-                    onClick={() => setSaveDestMode('default')}
-                    style={{ padding: '6px 4px', fontSize: '9.5px' }}
-                  >
-                    Default
-                  </button>
-                  <button
-                    className={`clean-preset-btn ${saveDestMode === 'custom' ? 'active' : ''}`}
-                    onClick={handleBrowseDestFolder}
-                    style={{ padding: '6px 4px', fontSize: '9.5px' }}
-                  >
-                    Custom...
-                  </button>
-                </div>
-                <span style={{ fontSize: '9px', color: 'var(--color-slate)', fontStyle: 'italic', display: 'block', marginTop: '4px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={
-                  saveDestMode === 'original' ? 'Original file directory' :
-                  saveDestMode === 'default' ? (localStorage.getItem('rfine_def_save_dir') || 'Default folder not set') :
-                  customDestPath || 'No folder selected'
-                }>
-                  Saving to: {
-                    saveDestMode === 'original' ? 'Original Folder' :
-                    saveDestMode === 'default' ? (localStorage.getItem('rfine_def_save_dir') || 'Default not set') :
-                    customDestPath ? path.basename(customDestPath) : 'Not configured'
-                  }
-                </span>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
-                  <input 
-                    type="checkbox" 
-                    id="chk-ext-open-folder"
-                    checked={openOnComplete}
-                    onChange={(e) => setOpenOnComplete(e.target.checked)}
-                  />
-                  <label htmlFor="chk-ext-open-folder" style={{ fontSize: '11px', color: 'var(--color-white)', cursor: 'pointer' }}>
-                    Auto-Open Output Directory
-                  </label>
-                </div>
-              </div>
-            )}
           </div>
         </div>
 
-        {/* Sticky Pinned Button Container */}
-        {gallery.length > 0 && (
-          <div style={{ paddingTop: '15px', borderTop: '1px solid var(--glass-border)', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              <button 
-                onClick={handleDownloadAll}
-                className="btn-secondary flex-center" 
-                style={{ padding: '10px 0', fontSize: '11px', justifyContent: 'center', borderColor: 'var(--glass-border)' }}
-              >
-                SAVE ALL
-              </button>
-              <button 
-                onClick={handleDownloadSelected}
-                className="btn-primary flex-center" 
-                style={{ padding: '10px 0', fontSize: '11px', justifyContent: 'center', color: '#FFFFFF' }}
-              >
-                SAVE SELECTED
-              </button>
-            </div>
-          </div>
-        )}
+        <div style={{ paddingTop: '15px', borderTop: '1px solid var(--glass-border)', flexShrink: 0 }}>
+          <button className="process-action-btn flex-center" onClick={handleCompress} disabled={compressing || files.length === 0} style={{ width: '100%', color: '#FFFFFF', justifyContent: 'center', gap: '6px' }}>
+            <Zap size={14} color="#FFFFFF" fill="#FFFFFF" />
+            <span style={{ color: '#FFFFFF' }}>{compressing ? 'COMPRESSING...' : 'COMPRESS SELECTED'}</span>
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
-// ----------------------------------------------------------------------------
-// BULK RENAMER MODULE (UNIFIED 2-COLUMN LAYOUT WITH DRAG-AND-DROP SORTING)
+
 // ----------------------------------------------------------------------------
 function FileRenamer({ files, setFiles, setGlobalProgress, explorerPreviewFile, setExplorerPreviewFile, theme, openFolderPicker, isDraggingFile, explorerHeight, setExplorerHeight, addRecentProcess, onOpenFullscreenPreview, isFileBrowserCollapsed, toggleFileBrowser }) {
   const [folderPath, setFolderPath] = useState('');
@@ -5671,8 +4269,7 @@ function AudioStudio({ files, setFiles, setGlobalProgress, theme, openFolderPick
               const isSelected = activePreviewFile?.path === f.path;
 
               return (
-                <div 
-                  key={f.path} 
+                  <div key={f.path} 
                   draggable
                   onDragStart={(e) => handleDragStart(e, idx)}
                   onDragOver={(e) => handleDragOver(e, idx)}
@@ -5688,7 +4285,7 @@ function AudioStudio({ files, setFiles, setGlobalProgress, theme, openFolderPick
                     borderBottom: idx === files.length - 1 ? 'none' : '1px solid var(--glass-border)', 
                     backgroundColor: isSelected ? 'rgba(77, 155, 34, 0.05)' : 'transparent',
                     borderTop: dragOverIndex === idx && draggedIndex > idx ? '2px solid var(--primary-color)' : '',
-                    borderBottomActive: dragOverIndex === idx && draggedIndex < idx ? '2px solid var(--primary-color)' : '',
+                    // borderBottomActive: dragOverIndex === idx && draggedIndex < idx ? '2px solid var(--primary-color)' : '',
                     cursor: 'pointer'
                   }}
                 >
@@ -5917,53 +4514,96 @@ function AudioStudio({ files, setFiles, setGlobalProgress, theme, openFolderPick
 // ----------------------------------------------------------------------------
 // GIF CREATOR MODULE (v1.1)
 // ----------------------------------------------------------------------------
-function GIFCreator({ files, setFiles, setGlobalProgress, theme, openFolderPicker, isDraggingFile, explorerHeight, setExplorerHeight, addRecentProcess, isFileBrowserCollapsed, toggleFileBrowser }) {
-  const [startTime, setStartTime] = useState('0.0');
-  const [duration, setDuration] = useState('5.0');
+function GIFCreator({ files, setFiles, setGlobalProgress, explorerPreviewFile, theme, openFolderPicker, isDraggingFile, explorerHeight, setExplorerHeight, addRecentProcess, onOpenFullscreenPreview, isFileBrowserCollapsed, toggleFileBrowser }) {
+  const [activePreviewFile, setActivePreviewFile] = useState(null);
+  const [successResult, setSuccessResult] = useState(null);
+  const [processing, setProcessing] = useState(false);
+
+  const [startTime, setStartTime] = useState('0');
+  const [duration, setDuration] = useState('5');
   const [gifWidth, setGifWidth] = useState('480');
   const [gifFps, setGifFps] = useState('15');
 
-  const [saveDestMode, setSaveDestMode] = useState('original');
-  const [customDestPath, setCustomDestPath] = useState('');
-  const [openOnComplete, setOpenOnComplete] = useState(true);
-  const [successResult, setSuccessResult] = useState(null);
-  const [processing, setProcessing] = useState(false);
-  const [activePreviewFile, setActivePreviewFile] = useState(null);
+  const [saveDestMode, setSaveDestMode] = useState(() => localStorage.getItem('rfine_gif_save_dest_mode') || 'original');
+  const [customDestPath, setCustomDestPath] = useState(() => localStorage.getItem('rfine_gif_custom_dest_path') || '');
+  const [openOnComplete, setOpenOnComplete] = useState(() => {
+    const val = localStorage.getItem('rfine_gif_open_on_complete');
+    return val === null ? true : val === 'true';
+  });
+
+  const [sectionConfigExpanded, setSectionConfigExpanded] = useState(true);
+  const [sectionSaveExpanded, setSectionSaveExpanded] = useState(true);
 
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
 
-  const handleDragStart = (e, idx) => {
-    e.dataTransfer.effectAllowed = 'move';
-    setDraggedIndex(idx);
-    window.isDraggingQueueItem = true;
-  };
-
-  const handleDragOver = (e, idx) => {
-    e.preventDefault();
-    setDragOverIndex(idx);
-  };
-
-  const handleDragLeave = () => {
-    setDragOverIndex(null);
-  };
-
-  const handleDragEnd = () => {
-    setDraggedIndex(null);
-    setDragOverIndex(null);
-    window.isDraggingQueueItem = false;
-  };
-
-  const handleDrop = (e, idx) => {
+  const handleDragStart = (e, index) => setDraggedIndex(index);
+  const handleDragOver = (e, index) => { e.preventDefault(); setDragOverIndex(index); };
+  const handleDragLeave = () => setDragOverIndex(null);
+  const handleDragEnd = () => { setDraggedIndex(null); setDragOverIndex(null); };
+  const handleDrop = (e, targetIndex) => {
     e.preventDefault();
     if (draggedIndex === null) return;
-    const reordered = [...files];
-    const [removed] = reordered.splice(draggedIndex, 1);
-    reordered.splice(idx, 0, removed);
-    setFiles(reordered);
+    const updated = [...files];
+    const item = updated.splice(draggedIndex, 1)[0];
+    updated.splice(targetIndex, 0, item);
+    setFiles(updated);
     setDraggedIndex(null);
     setDragOverIndex(null);
-    window.isDraggingQueueItem = false;
+  };
+
+  const handleAddVideo = (newFiles) => {
+    setFiles(prev => {
+      const existing = prev.map(f => f.path);
+      const filtered = newFiles.filter(nf => !existing.includes(nf.path));
+      return [...prev, ...filtered];
+    });
+  };
+
+  const handleBrowseDestFolder = () => {
+    if (openFolderPicker) {
+      openFolderPicker(customDestPath, (selectedPath) => {
+        setCustomDestPath(selectedPath);
+        setSaveDestMode('custom');
+      });
+    }
+  };
+
+  const handleApplyGIF = async () => {
+    if (files.length === 0) return;
+    setProcessing(true);
+    setSuccessResult(null);
+    try {
+      const res = await fetch(`${API_BASE}/gif/create-batch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          files, startTime, duration, width: gifWidth, fps: gifFps,
+          outputFolder: saveDestMode === 'original' ? undefined : saveDestMode === 'default' ? (localStorage.getItem('rfine_def_save_dir') || undefined) : customDestPath || undefined
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to create GIF');
+      let lastSavedFolder = data.targetFolder || '';
+      if (data.results && addRecentProcess) {
+        data.results.forEach(r => {
+          if (r.success) {
+            addRecentProcess('GIF Creator', r.name, r.originalSize, r.optimizedSize, r.targetFolder);
+            lastSavedFolder = r.targetFolder;
+          }
+        });
+      }
+      setSuccessResult({ results: data.results, targetFolder: lastSavedFolder });
+      if (openOnComplete && lastSavedFolder) {
+        try {
+          await fetch(`${API_BASE}/open-folder`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ folderPath: lastSavedFolder }) });
+        } catch (e) {}
+      }
+    } catch (e) {
+      alert('GIF Creation failed: ' + e.message);
+    } finally {
+      setProcessing(false);
+    }
   };
 
   const handleDividerMouseDown = (e) => {
@@ -5983,129 +4623,13 @@ function GIFCreator({ files, setFiles, setGlobalProgress, theme, openFolderPicke
     document.addEventListener('mouseup', onMouseUp);
   };
 
-  const [sectionConfigExpanded, setSectionConfigExpanded] = useState(true);
-  const [sectionSaveExpanded, setSectionSaveExpanded] = useState(true);
-
-  const handleBrowseDestFolder = () => {
-    openFolderPicker(customDestPath, (path) => {
-      setCustomDestPath(path);
-      setSaveDestMode('custom');
-    });
-  };
-
-  const getDefaultOutputPath = () => {
-    return localStorage.getItem('rfine_def_save_dir') || '';
-  };
-
-  const handleAddVideo = (selected) => {
-    const formatted = selected.map(f => {
-      if (typeof f === 'string') {
-        return { path: f, name: path.basename(f), size: 0 };
-      }
-      return f;
-    });
-    setFiles(prev => {
-      const updated = [...prev];
-      formatted.forEach(item => {
-        if (!updated.some(x => x.path === item.path)) {
-          updated.push(item);
-        }
-      });
-      if (!activePreviewFile && updated.length > 0) {
-        setActivePreviewFile(updated[0]);
-      }
-      return updated;
-    });
-    setSuccessResult(null);
-  };
-
-  const handleApplyGIF = async () => {
-    if (files.length === 0 || processing) return;
-    setProcessing(true);
-    setSuccessResult(null);
-
-    let lastSavedFolder = '';
-    try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        setGlobalProgress({ 
-          active: true, 
-          percent: Math.round((i / files.length) * 100), 
-          label: `Creating GIF ${i + 1}/${files.length}: ${file.name}...` 
-        });
-
-        const destFolder = saveDestMode === 'original' ? path.dirname(file.path) :
-                           saveDestMode === 'default' ? getDefaultOutputPath() :
-                           customDestPath;
-                           
-        const outName = `${path.parse(file.path).name}_clip.gif`;
-        const outputPath = path.join(destFolder || path.dirname(file.path), outName);
-
-        const res = await fetch(`${API_BASE}/gif/create`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            filePath: file.path,
-            outputPath,
-            startTime,
-            duration,
-            width: gifWidth,
-            fps: gifFps
-          })
-        });
-        const data = await res.json();
-        if (!data.success) throw new Error(data.error || 'GIF creation failed');
-        lastSavedFolder = destFolder || path.dirname(file.path);
-        if (addRecentProcess) {
-          addRecentProcess(
-            'GIF Creator',
-            `${path.parse(file.path).name}_clip.gif`,
-            file.size || null,
-            null,
-            lastSavedFolder
-          );
-        }
-      }
-
-      setGlobalProgress({ active: true, percent: 100, label: 'All GIFs created successfully!' });
-      setTimeout(() => setGlobalProgress({ active: false, percent: 0, label: '' }), 3000);
-      setSuccessResult({ targetFolder: lastSavedFolder });
-
-      if (openOnComplete && lastSavedFolder) {
-        await fetch(`${API_BASE}/open-folder`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ folderPath: lastSavedFolder })
-        });
-      }
-    } catch (e) {
-      console.error(e);
-      alert('Error creating GIFs: ' + e.message);
-      setGlobalProgress({ active: false, percent: 0, label: '' });
-    } finally {
-      setProcessing(false);
-    }
-  };
-
   return (
-    <div className="workspace-layout">
-      {/* Middle Canvas: File Explorer + Processing Queue */}
-      <div className="middle-canvas">
-        <CollapsibleFileBrowser
-          isFileBrowserCollapsed={isFileBrowserCollapsed}
-          toggleFileBrowser={toggleFileBrowser}
-          explorerHeight={explorerHeight}
-          handleDividerMouseDown={handleDividerMouseDown}
-        >
+    <div style={{ display: 'flex', width: '100%', height: '100%', minWidth: 0, position: 'relative' }}>
+      <div className="middle-canvas" style={{ display: 'flex', flexDirection: 'column', height: '100%', minWidth: 0, overflow: 'hidden' }}>
+        <CollapsibleFileBrowser isFileBrowserCollapsed={isFileBrowserCollapsed} toggleFileBrowser={toggleFileBrowser} explorerHeight={explorerHeight} handleDividerMouseDown={handleDividerMouseDown}>
           <FileExplorer 
             onAddFiles={handleAddVideo} 
             allowedExtensions={['.mp4', '.webm', '.mkv', '.mov', '.avi']}
-            maxListHeight={null}
-            onPreviewFile={(f) => {
-              const fileObj = typeof f === 'string' ? { path: f, name: path.basename(f), size: 0 } : f;
-              handleAddVideo([fileObj]);
-              setActivePreviewFile(fileObj);
-            }}
             theme={theme}
             defaultPath={localStorage.getItem('rfine_def_video_dir') || undefined}
             storageKey="rfine_last_dir_gif_creator"
@@ -6114,336 +4638,74 @@ function GIFCreator({ files, setFiles, setGlobalProgress, theme, openFolderPicke
           />
         </CollapsibleFileBrowser>
 
-        {/* Processing Queue Title */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-white)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Processing Queue</span>
-            <span style={{ fontSize: '10px', fontWeight: 'bold', background: 'rgba(77, 155, 34, 0.1)', color: 'var(--primary-color)', padding: '2px 8px', borderRadius: '12px' }}>
-              {files.length} {files.length === 1 ? 'item' : 'items'}
-            </span>
-          </div>
-          <button 
-            className="btn-secondary" 
-            style={{ padding: '4px 8px', fontSize: '10px', borderColor: 'transparent', background: 'transparent' }} 
-            onClick={() => {
-              setFiles([]);
-              setActivePreviewFile(null);
-              setSuccessResult(null);
-            }}
-          >
-            Clear All
-          </button>
-        </div>
-
-        {successResult && (
-          <div className="animate-fade-in" style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'space-between',
-            padding: '10px 14px', 
-            background: 'rgba(77, 155, 34, 0.08)', 
-            border: '1px solid rgba(77, 155, 34, 0.25)', 
-            borderRadius: '6px', 
-            fontSize: '11px', 
-            color: '#72BC28', 
-            fontWeight: 'bold',
-            marginBottom: '12px',
-            gap: '12px',
-            flexShrink: 0
-          }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <CheckCircle size={14} color="#72BC28" />
-              Animated GIFs created successfully!
-            </span>
-            {successResult.targetFolder && (
-              <button 
-                onClick={async () => {
-                  try {
-                    await fetch(`${API_BASE}/open-folder`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ folderPath: successResult.targetFolder })
-                    });
-                  } catch (e) { console.error(e); }
-                }}
-                className="btn-secondary"
-                style={{ padding: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.05)', borderColor: 'var(--glass-border)', color: 'var(--primary-color)', borderRadius: '4px' }}
-                title="Open Saved Directory"
-              >
-                <FolderOpen size={14} color="var(--primary-color)" />
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* Selected Files List */}
-        {files.length > 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', border: '1px solid var(--glass-border)', borderRadius: '6px', overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.02)', marginBottom: '15px', flexShrink: 0, maxHeight: '200px', overflowY: 'auto' }}>
-            {files.map((f, idx) => {
-              const fileName = f.name;
-              const fileSize = f.size ? formatFileSize(f.size) : '0 KB';
+        {files.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', border: '1px solid var(--glass-border)', borderRadius: '6px', overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.02)', marginBottom: '15px', flexShrink: 0 }}>
+            {files.map((file, idx) => {
+              const fileName = typeof file === 'string' ? path.basename(file) : file.name;
+              const fileSize = typeof file === 'string' ? '' : formatFileSize(file.size);
               const ext = path.extname(fileName).toUpperCase().replace('.', '');
-              const isSelected = activePreviewFile?.path === f.path;
-
               return (
-                <div 
-                  key={f.path} 
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, idx)}
-                  onDragOver={(e) => handleDragOver(e, idx)}
-                  onDragLeave={handleDragLeave}
-                  onDragEnd={handleDragEnd}
-                  onDrop={(e) => handleDrop(e, idx)}
-                  onClick={() => setActivePreviewFile(f)}
-                  style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'space-between', 
-                    padding: '8px 12px', 
-                    borderBottom: idx === files.length - 1 ? 'none' : '1px solid var(--glass-border)', 
-                    backgroundColor: isSelected ? 'rgba(77, 155, 34, 0.05)' : 'transparent',
-                    borderTop: dragOverIndex === idx && draggedIndex > idx ? '2px solid var(--primary-color)' : '',
-                    borderBottomActive: dragOverIndex === idx && draggedIndex < idx ? '2px solid var(--primary-color)' : '',
-                    cursor: 'pointer'
-                  }}
-                >
+                <div key={idx} draggable onDragStart={(e) => handleDragStart(e, idx)} onDragOver={(e) => handleDragOver(e, idx)} onDragLeave={handleDragLeave} onDragEnd={handleDragEnd} onDrop={(e) => handleDrop(e, idx)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderBottom: idx === files.length - 1 ? 'none' : '1px solid var(--glass-border)', cursor: 'grab' }} onClick={() => setActivePreviewFile(file)}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flexGrow: 1 }}>
-                    <span style={{ cursor: 'grab', color: 'var(--color-slate)', fontSize: '12px' }} onClick={(e) => e.stopPropagation()}>⋮⋮</span>
-                    <div style={{ width: '36px', height: '36px', background: 'rgba(0,0,0,0.05)', border: '1px solid var(--glass-border)', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
-                      <Video size={16} color="var(--primary-color)" />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                      <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-white)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{fileName}</span>
-                      <span style={{ fontSize: '10px', color: 'var(--color-slate)' }}>{ext} • {fileSize}</span>
-                    </div>
+                    <span style={{ cursor: 'grab', color: 'var(--color-slate)', fontSize: '12px' }}>⋮⋮</span>
+                    <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-white)' }}>{fileName} ({ext} • {fileSize})</span>
                   </div>
-                  <button 
-                    style={{ background: 'none', border: 'none', color: 'var(--primary-color)', cursor: 'pointer', display: 'flex', padding: '6px', borderRadius: '4px' }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const updated = files.filter(x => x.path !== f.path);
-                      setFiles(updated);
-                      if (activePreviewFile?.path === f.path) {
-                        setActivePreviewFile(updated.length > 0 ? updated[0] : null);
-                      }
-                    }}
-                    title="Remove file"
-                  >
-                    <Trash2 size={14} color="var(--primary-color)" />
-                  </button>
+                  <button style={{ background: 'none', border: 'none', color: 'var(--primary-color)', cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setFiles(prev => prev.filter((_, i) => i !== idx)); }}><Trash2 size={14} color="var(--primary-color)" /></button>
                 </div>
               );
             })}
           </div>
-        ) : (
-          /* Dashed Drag/Drop Area: Local Dropzone showing overlay only inside this container */
-          <div 
-            className="dropzone flex-center" 
-            onClick={() => document.getElementById('gif-creator-add-file-input').click()}
-            style={{ 
-              padding: '40px', 
-              position: 'relative',
-              overflow: 'hidden',
-              flexGrow: 1,
-              marginBottom: '15px'
-            }}
-          >
-            <input 
-              type="file"
-              id="gif-creator-add-file-input"
-              multiple
-              accept=".mp4,.webm,.mkv,.mov,.avi"
-              onChange={(e) => {
-                if (e.target.files) {
-                  const arr = Array.from(e.target.files).map(x => ({ path: x.path || x.name, name: x.name, size: x.size }));
-                  handleAddVideo(arr);
-                }
-              }}
-              style={{ display: 'none' }}
-            />
-            {isDraggingFile ? (
-              <>
-                <Download size={20} color="var(--primary-color)" className="animate-bounce" style={{ color: 'var(--primary-color)' }} />
-                <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--primary-color)' }}>Drop files here to start refining</span>
-              </>
-            ) : (
-              <>
-                <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-white)' }}>+ Add video files or drag & drop</span>
-                <span style={{ fontSize: '10px', color: 'var(--color-slate)' }}>Supports MP4, WebM, MKV, MOV, AVI</span>
-              </>
-            )}
-          </div>
         )}
+
+        <div className="dropzone flex-center" onClick={() => document.getElementById('gif-creator-add-file-input').click()} style={{ padding: '20px', position: 'relative' }}>
+          <input type="file" id="gif-creator-add-file-input" multiple accept=".mp4,.webm,.mkv,.mov,.avi" onChange={(e) => { if (e.target.files) { const arr = Array.from(e.target.files).map(x => ({ path: x.path || x.name, name: x.name, size: x.size })); handleAddVideo(arr); } }} style={{ display: 'none' }} />
+          <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-white)' }}>+ Add video files or drag & drop</span>
+        </div>
       </div>
 
-      {/* Right Sidebar: Refinement Settings */}
       <div className="right-sidebar">
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '0 0 4px 0' }}>
           <Image size={20} color="var(--primary-color)" />
-          <h2 style={{ fontSize: '18px', fontWeight: '800', color: 'var(--primary-color)', margin: 0, textTransform: 'uppercase' }}>GIF Creator</h2>
+          <h2 style={{ fontSize: '18px', fontWeight: '800', color: 'var(--primary-color)', margin: 0 }}>GIF CREATOR</h2>
         </div>
-        <p style={{ color: 'var(--color-slate)', fontSize: '11px', margin: '0 0 24px 0', lineHeight: '1.4' }}>Create animated GIFs.</p>
+        <p style={{ color: 'var(--color-slate)', fontSize: '11px', margin: '0 0 24px 0' }}>Create animated GIFs from videos.</p>
 
-        {/* Inner Scrollable Settings Container */}
         <div className="sidebar-settings-content">
-          {/* Active File info */}
-          {activePreviewFile && (
-            <div className="animate-fade-in" style={{ padding: '10px', background: 'rgba(0,0,0,0.05)', borderRadius: '6px', marginBottom: '16px', border: '1px solid var(--glass-border)' }}>
-              <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-white)', display: 'block', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={activePreviewFile.path}>
-                🎬 {activePreviewFile.name}
-              </span>
-            </div>
-          )}
-
-          {/* Category 1: GIF Configuration */}
           <div style={{ marginBottom: '16px' }}>
-            <div 
-              onClick={() => setSectionConfigExpanded(!sectionConfigExpanded)}
-              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '6px 0', borderBottom: '1px solid var(--glass-border)', marginBottom: '10px' }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Sliders size={13} color="var(--primary-color)" />
-                <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-white)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>GIF Clipper Settings</span>
+            <span className="form-label" style={{ fontSize: '10px' }}>GIF Clipper Settings</span>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '6px' }}>
+              <div>
+                <label className="form-label" style={{ fontSize: '10px' }}>Start Time (s)</label>
+                <input type="number" step="0.1" min="0" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="form-input" />
               </div>
-              <span style={{ fontSize: '10px', color: 'var(--color-slate)' }}>{sectionConfigExpanded ? '▼' : '▶'}</span>
+              <div>
+                <label className="form-label" style={{ fontSize: '10px' }}>Duration (s)</label>
+                <input type="number" step="0.1" min="0.5" value={duration} onChange={(e) => setDuration(e.target.value)} className="form-input" />
+              </div>
             </div>
-
-            {sectionConfigExpanded && (
-              <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                  <div>
-                    <label className="form-label" style={{ fontSize: '10px' }}>Start Time (s)</label>
-                    <input 
-                      type="number" 
-                      step="0.1" 
-                      min="0"
-                      value={startTime}
-                      onChange={(e) => setStartTime(e.target.value)}
-                      className="form-input" 
-                    />
-                  </div>
-
-                  <div>
-                    <label className="form-label" style={{ fontSize: '10px' }}>Duration (s)</label>
-                    <input 
-                      type="number" 
-                      step="0.1" 
-                      min="0.5"
-                      value={duration}
-                      onChange={(e) => setDuration(e.target.value)}
-                      className="form-input" 
-                    />
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                  <div>
-                    <label className="form-label" style={{ fontSize: '10px' }}>Width</label>
-                    <select 
-                      className="form-input" 
-                      value={gifWidth} 
-                      onChange={(e) => setGifWidth(e.target.value)}
-                      style={{ padding: '6px 10px', fontSize: '12px' }}
-                    >
-                      <option value="320">320px</option>
-                      <option value="480">480px</option>
-                      <option value="640">640px</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="form-label" style={{ fontSize: '10px' }}>Frame Rate</label>
-                    <select 
-                      className="form-input" 
-                      value={gifFps} 
-                      onChange={(e) => setGifFps(e.target.value)}
-                      style={{ padding: '6px 10px', fontSize: '12px' }}
-                    >
-                      <option value="10">10 fps</option>
-                      <option value="15">15 fps</option>
-                      <option value="24">24 fps</option>
-                    </select>
-                  </div>
-                </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px' }}>
+              <div>
+                <label className="form-label" style={{ fontSize: '10px' }}>Width</label>
+                <select className="form-input" value={gifWidth} onChange={(e) => setGifWidth(e.target.value)} style={{ padding: '6px 10px', fontSize: '12px' }}>
+                  <option value="320">320px</option>
+                  <option value="480">480px</option>
+                  <option value="640">640px</option>
+                </select>
               </div>
-            )}
-          </div>
-
-          {/* Category 2: Save Destination */}
-          <div style={{ marginBottom: '20px' }}>
-            <div 
-              onClick={() => setSectionSaveExpanded(!sectionSaveExpanded)}
-              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '6px 0', borderBottom: '1px solid var(--glass-border)', marginBottom: '10px' }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <FolderOpen size={13} color="var(--primary-color)" />
-                <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-white)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Save Destination</span>
+              <div>
+                <label className="form-label" style={{ fontSize: '10px' }}>Frame Rate</label>
+                <select className="form-input" value={gifFps} onChange={(e) => setGifFps(e.target.value)} style={{ padding: '6px 10px', fontSize: '12px' }}>
+                  <option value="10">10 fps</option>
+                  <option value="15">15 fps</option>
+                  <option value="24">24 fps</option>
+                </select>
               </div>
-              <span style={{ fontSize: '10px', color: 'var(--color-slate)' }}>{sectionSaveExpanded ? '▼' : '▶'}</span>
             </div>
-
-            {sectionSaveExpanded && (
-              <div className="animate-fade-in" style={{ padding: '2px 0' }}>
-                <span className="form-label" style={{ fontSize: '10px' }}>Target Directory</span>
-                <div className="clean-preset-grid" style={{ gridTemplateColumns: '1fr 1fr 1.2fr' }}>
-                  <button
-                    className={`clean-preset-btn ${saveDestMode === 'original' ? 'active' : ''}`}
-                    onClick={() => setSaveDestMode('original')}
-                    style={{ padding: '6px 4px', fontSize: '9.5px' }}
-                  >
-                    Original
-                  </button>
-                  <button
-                    className={`clean-preset-btn ${saveDestMode === 'default' ? 'active' : ''}`}
-                    onClick={() => setSaveDestMode('default')}
-                    style={{ padding: '6px 4px', fontSize: '9.5px' }}
-                  >
-                    Default
-                  </button>
-                  <button
-                    className={`clean-preset-btn ${saveDestMode === 'custom' ? 'active' : ''}`}
-                    onClick={handleBrowseDestFolder}
-                    style={{ padding: '6px 4px', fontSize: '9.5px' }}
-                  >
-                    Custom...
-                  </button>
-                </div>
-                <span style={{ fontSize: '9px', color: 'var(--color-slate)', fontStyle: 'italic', display: 'block', marginTop: '4px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={
-                  saveDestMode === 'original' ? 'Original file directory' :
-                  saveDestMode === 'default' ? (localStorage.getItem('rfine_def_save_dir') || 'Default folder not set') :
-                  customDestPath || 'No folder selected'
-                }>
-                  Saving to: {
-                    saveDestMode === 'original' ? 'Original Folder' :
-                    saveDestMode === 'default' ? (localStorage.getItem('rfine_def_save_dir') || 'Default not set') :
-                    customDestPath ? path.basename(customDestPath) : 'Not configured'
-                  }
-                </span>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
-                  <input 
-                    type="checkbox" 
-                    id="chk-gif-open-folder"
-                    checked={openOnComplete}
-                    onChange={(e) => setOpenOnComplete(e.target.checked)}
-                  />
-                  <label htmlFor="chk-gif-open-folder" style={{ fontSize: '11px', color: 'var(--color-white)', cursor: 'pointer' }}>
-                    Auto-Open Output Directory
-                  </label>
-                </div>
-              </div>
-            )}
           </div>
         </div>
 
-        {/* Sticky Pinned Button Container */}
         <div style={{ paddingTop: '15px', borderTop: '1px solid var(--glass-border)', flexShrink: 0 }}>
-          <button 
-            className="process-action-btn flex-center"
-            onClick={handleApplyGIF}
-            disabled={processing || files.length === 0}
-            style={{ width: '100%', color: '#FFFFFF', justifyContent: 'center', gap: '6px' }}
-          >
+          <button className="process-action-btn flex-center" onClick={handleApplyGIF} disabled={processing || files.length === 0} style={{ width: '100%', color: '#FFFFFF', justifyContent: 'center', gap: '6px' }}>
             <Zap size={14} color="#FFFFFF" fill="#FFFFFF" />
             <span style={{ color: '#FFFFFF' }}>{processing ? 'CREATING...' : 'CREATE ANIMATED GIF'}</span>
           </button>
@@ -6453,8 +4715,6 @@ function GIFCreator({ files, setFiles, setGlobalProgress, theme, openFolderPicke
   );
 }
 
-// ----------------------------------------------------------------------------
-// CASE CONVERTER MODULE (NEW 8TH TAB - SEPARATE TEXT TOOL)
 // ----------------------------------------------------------------------------
 function CaseConverter({ theme }) {
   const [inputText, setInputText] = useState('');
@@ -6737,15 +4997,14 @@ function ColorStudio({ theme, explorerHeight, setExplorerHeight, isFileBrowserCo
       v /= 255;
       return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
     });
-    return a[0] * 0.2126 + a[1] * 0.7152 + a[2] * 0.0722;
+    return a[0] * 0.2126 + a[1] * 0.7152 + a[2] * 0.722;
   };
 
   const getContrastRatio = (color1, color2) => {
     const l1 = getLuminance(color1[0], color1[1], color1[2]);
     const l2 = getLuminance(color2[0], color2[1], color2[2]);
-    const lightest = Math.max(l1, l2);
-    const darkest = Math.min(l1, l2);
-    return (lightest + 0.05) / (darkest + 0.05);
+    const ratio = (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+    return { ratio, pass: ratio >= 4.5 };
   };
 
   const hslToHex = (h, s, l) => {
@@ -6842,28 +5101,26 @@ function ColorStudio({ theme, explorerHeight, setExplorerHeight, isFileBrowserCo
 
   return (
     <div className="workspace-layout animate-fade-in">
-      
-      {/* MIDDLE: Canvas area for tools */}
       <div className="middle-canvas">
         {subView === 'picker' ? (
           <>
             <CollapsibleFileBrowser
-          isFileBrowserCollapsed={isFileBrowserCollapsed}
-          toggleFileBrowser={toggleFileBrowser}
-          explorerHeight={explorerHeight}
-          setExplorerHeight={setExplorerHeight}
-        >
-          <FileExplorer 
-                    onAddFiles={(files) => {
-                      if(files.length > 0) handlePreviewFile(files[0]);
-                    }} 
-                    maxListHeight="100%"
-                    onPreviewFile={handlePreviewFile}
-                    theme={theme}
-                    showActions={false}
-                    onCollapse={toggleFileBrowser}
-                  />
-        </CollapsibleFileBrowser>
+              isFileBrowserCollapsed={isFileBrowserCollapsed}
+              toggleFileBrowser={toggleFileBrowser}
+              explorerHeight={explorerHeight}
+              setExplorerHeight={setExplorerHeight}
+            >
+              <FileExplorer 
+                onAddFiles={(files) => {
+                  if(files.length > 0) handlePreviewFile(files[0]);
+                }} 
+                maxListHeight="100%"
+                onPreviewFile={handlePreviewFile}
+                theme={theme}
+                showActions={false}
+                onCollapse={toggleFileBrowser}
+              />
+            </CollapsibleFileBrowser>
 
             <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0, overflowY: 'auto' }}>
               <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', minHeight: '300px', padding: '20px' }}>
@@ -6990,7 +5247,6 @@ function ColorStudio({ theme, explorerHeight, setExplorerHeight, isFileBrowserCo
         )}
       </div>
 
-      {/* RIGHT: Sidebar tools */}
       <div className="right-sidebar">
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '0 0 4px 0' }}>
           <Pipette size={20} color="var(--primary-color)" />
@@ -7056,156 +5312,179 @@ function ColorStudio({ theme, explorerHeight, setExplorerHeight, isFileBrowserCo
           <span style={{ fontSize: '12px', fontWeight: 'bold', display: 'block', marginBottom: '12px' }}>WCAG CONTRAST</span>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div style={{ background: pickedColor, padding: '12px', borderRadius: '8px', border: '1px solid var(--glass-border)', textAlign: 'center' }}>
-              <span style={{ color: contrastWhite >= 4.5 ? '#FFFFFF' : '#FFFFFF', fontSize: '14px', fontWeight: 'bold' }}>White Text</span>
-              <div style={{ marginTop: '8px', fontSize: '10px', background: 'rgba(255,255,255,0.2)', color: '#FFF', padding: '4px', borderRadius: '4px' }}>
-                {contrastWhite.toFixed(2)}:1 ({contrastWhite >= 4.5 ? 'AA' : 'FAIL'})
-              </div>
+              <span style={{ fontSize: '9px', fontWeight: 'bold', color: '#FFF', display: 'block' }}>ON WHITE</span>
+              <span style={{ fontSize: '14px', fontWeight: '800', color: '#FFF' }}>{contrastWhite.ratio.toFixed(2)}:1</span>
+              <span style={{ fontSize: '9px', display: 'block', marginTop: '2px', color: contrastWhite.pass ? '#4E9F3D' : '#FF5D5D' }}>
+                {contrastWhite.pass ? 'PASS (AA)' : 'FAIL'}
+              </span>
             </div>
             <div style={{ background: pickedColor, padding: '12px', borderRadius: '8px', border: '1px solid var(--glass-border)', textAlign: 'center' }}>
-              <span style={{ color: contrastBlack >= 4.5 ? '#000000' : '#000000', fontSize: '14px', fontWeight: 'bold' }}>Black Text</span>
-              <div style={{ marginTop: '8px', fontSize: '10px', background: 'rgba(0,0,0,0.2)', color: '#000', padding: '4px', borderRadius: '4px' }}>
-                {contrastBlack.toFixed(2)}:1 ({contrastBlack >= 4.5 ? 'AA' : 'FAIL'})
-              </div>
+              <span style={{ fontSize: '9px', fontWeight: 'bold', color: '#000', display: 'block' }}>ON BLACK</span>
+              <span style={{ fontSize: '14px', fontWeight: '800', color: '#000' }}>{contrastBlack.ratio.toFixed(2)}:1</span>
+              <span style={{ fontSize: '9px', display: 'block', marginTop: '2px', color: contrastBlack.pass ? '#4E9F3D' : '#FF5D5D' }}>
+                {contrastBlack.pass ? 'PASS (AA)' : 'FAIL'}
+              </span>
             </div>
           </div>
         </div>
-
       </div>
     </div>
   );
 }
 
 // ----------------------------------------------------------------------------
-// SYSTEM SETTINGS STUDIO
+// SETTINGS TAB MODULE
 // ----------------------------------------------------------------------------
 function SettingsTab({ theme, setTheme, openFolderPicker }) {
-  const [defSaveDir, setDefSaveDir] = useState(() => localStorage.getItem('rfine_def_save_dir') || '');
+  const [defaultSaveDir, setDefaultSaveDir] = useState(() => localStorage.getItem('rfine_def_save_dir') || '');
+  const [currentTheme, setCurrentTheme] = useState(() => localStorage.getItem('rfine_theme') || 'dark');
   const [favorites, setFavorites] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('rfine_favorites')) || [];
+      return JSON.parse(localStorage.getItem('rfine_favorite_folders')) || [];
     } catch {
       return [];
     }
   });
 
-  const saveSettings = () => {
-    localStorage.setItem('rfine_def_save_dir', defSaveDir);
-    alert('Settings saved successfully!');
-  };
-
-  const removeFavorite = (pathToRemove) => {
-    const updated = favorites.filter(f => f !== pathToRemove);
-    setFavorites(updated);
-    localStorage.setItem('rfine_favorites', JSON.stringify(updated));
-  };
-
-  const handleResetAll = () => {
-    if (window.confirm('Are you sure you want to reset all settings to defaults? This will clear favorites and paths.')) {
-      localStorage.clear();
-      setDefSaveDir('');
-      setFavorites([]);
-      setTheme('dark');
-      alert('All settings reset to defaults.');
+  const handleSelectSaveDir = () => {
+    if (openFolderPicker) {
+      openFolderPicker(defaultSaveDir, (selectedPath) => {
+        if (selectedPath) {
+          setDefaultSaveDir(selectedPath);
+          localStorage.setItem('rfine_def_save_dir', selectedPath);
+        }
+      });
     }
   };
 
-  const handleOpenPicker = () => {
-    openFolderPicker(defSaveDir, (selectedPath) => {
-      setDefSaveDir(selectedPath);
-    });
+  const handleRemoveFavorite = (idx) => {
+    const updated = favorites.filter((_, i) => i !== idx);
+    setFavorites(updated);
+    localStorage.setItem('rfine_favorite_folders', JSON.stringify(updated));
+  };
+
+  const handleThemeChange = (newTheme) => {
+    setCurrentTheme(newTheme);
+    localStorage.setItem('rfine_theme', newTheme);
+    if (setTheme) setTheme(newTheme);
+    if (newTheme === 'light') {
+      document.body.classList.add('light-theme');
+      document.body.classList.remove('dark-theme');
+    } else {
+      document.body.classList.add('dark-theme');
+      document.body.classList.remove('light-theme');
+    }
   };
 
   return (
-    <div className="animate-fade-in animate-slide-in" style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '15px', position: 'relative', padding: '24px 30px' }}>
-      <div>
-        <h1 style={{ margin: '0 0 6px 0', fontSize: '20px', fontWeight: '900', color: 'var(--color-white)' }}>SYSTEM SETTINGS</h1>
-        <p style={{ color: 'var(--color-slate)', fontSize: '11px', margin: 0 }}>Configure default output targets, favorite workspaces, and theme options.</p>
-      </div>
-
-      {/* Theme Selection */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: '6px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', padding: '30px 40px', height: '100%', boxSizing: 'border-box', overflowY: 'auto' }} className="animate-fade-in">
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px', borderBottom: '1px solid var(--glass-border)', paddingBottom: '16px' }}>
+        <Settings size={24} color="var(--primary-color)" />
         <div>
-          <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-white)', display: 'block' }}>Interface Theme</span>
-          <span style={{ fontSize: '10px', color: 'var(--color-slate)' }}>Toggle between light and dark visual aesthetics.</span>
-        </div>
-        <button
-          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          className="btn-secondary"
-          style={{ padding: '6px 12px', fontSize: '11px' }}
-        >
-          {theme === 'dark' ? 'Switch to Light' : 'Switch to Dark'}
-        </button>
-      </div>
-
-      {/* Unified Default Save Folder */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '16px', background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: '6px' }}>
-        <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-white)' }}>Default Save Folder</span>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <input
-            type="text"
-            className="form-input"
-            readOnly
-            placeholder="No default folder configured"
-            value={defSaveDir}
-            style={{ padding: '8px', fontSize: '11px', flexGrow: 1, background: 'rgba(0,0,0,0.1)', cursor: 'default' }}
-          />
-          <button
-            onClick={handleOpenPicker}
-            className="btn-secondary"
-            style={{ padding: '8px 12px', fontSize: '11px', whiteSpace: 'nowrap' }}
-          >
-            Browse...
-          </button>
+          <h1 style={{ fontSize: '22px', fontWeight: '800', color: 'var(--color-white)', margin: 0 }}>Settings</h1>
+          <p style={{ fontSize: '11px', color: 'var(--color-slate)', margin: '4px 0 0 0' }}>Configure default save directories and application preferences.</p>
         </div>
       </div>
 
-      {/* Favorite Workspaces */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '16px', background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: '6px', flexGrow: 1, minHeight: 0 }}>
-        <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-white)' }}>Favorite Workspaces</span>
-        {favorites.length === 0 ? (
-          <div style={{ display: 'flex', flexGrow: 1, alignItems: 'center', justifyContent: 'center', color: 'var(--color-slate)', fontSize: '11px', fontStyle: 'italic' }}>
-            No favorite folders saved yet. Star folders in the file explorer to add them here.
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', width: '100%' }}>
+        {/* Left Column: Default Save Dir & Theme */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div className="glass-panel" style={{ padding: '20px', borderRadius: '10px', border: '1px solid var(--glass-border)' }}>
+            <h3 style={{ fontSize: '14px', fontWeight: '700', color: 'var(--color-white)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <FolderOpen size={16} color="var(--primary-color)" /> Default Save Directory
+            </h3>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <input type="text" readOnly value={defaultSaveDir || 'No default directory set'} className="form-input" style={{ flexGrow: 1, fontSize: '12px' }} />
+              <button onClick={handleSelectSaveDir} className="btn-secondary" style={{ padding: '8px 16px', fontSize: '12px', fontWeight: 'bold' }}>Browse...</button>
+            </div>
           </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto' }}>
-            {favorites.map((fav) => (
-              <div key={fav} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--glass-border)', borderRadius: '6px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flexGrow: 1, marginRight: '10px' }}>
-                  <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {fav.substring(fav.lastIndexOf('\\') + 1) || fav}
-                  </span>
-                  <span style={{ fontSize: '9px', color: 'var(--color-slate)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={fav}>
-                    {fav}
-                  </span>
-                </div>
-                <button
-                  onClick={() => removeFavorite(fav)}
-                  style={{ background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer', display: 'flex', padding: '4px' }}
-                >
-                  Remove
-                </button>
+
+          <div className="glass-panel" style={{ padding: '20px', borderRadius: '10px', border: '1px solid var(--glass-border)' }}>
+            <h3 style={{ fontSize: '14px', fontWeight: '700', color: 'var(--color-white)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Sun size={16} color="var(--primary-color)" /> Interface Theme
+            </h3>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button onClick={() => handleThemeChange('dark')} className={`clean-preset-btn ${currentTheme === 'dark' ? 'active' : ''}`} style={{ flex: 1, padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}><Moon size={14} /> Dark Theme</button>
+              <button onClick={() => handleThemeChange('light')} className={`clean-preset-btn ${currentTheme === 'light' ? 'active' : ''}`} style={{ flex: 1, padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}><Sun size={14} /> Light Theme</button>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column: Favorited Directories */}
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <div className="glass-panel" style={{ padding: '20px', borderRadius: '10px', border: '1px solid var(--glass-border)', height: '100%', boxSizing: 'border-box' }}>
+            <h3 style={{ fontSize: '14px', fontWeight: '700', color: 'var(--color-white)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Star size={16} color="var(--primary-color)" fill="var(--primary-color)" /> Favorited Directories
+            </h3>
+            {favorites.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {favorites.map((fav, idx) => (
+                  <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: 'rgba(0,0,0,0.05)', border: '1px solid var(--glass-border)', borderRadius: '6px' }}>
+                    <span style={{ fontSize: '12px', color: 'var(--color-white)', wordBreak: 'break-all' }}>{fav}</span>
+                    <button onClick={() => handleRemoveFavorite(idx)} style={{ background: 'none', border: 'none', color: 'var(--primary-color)', cursor: 'pointer', padding: '4px' }} title="Remove favorite"><Trash2 size={14} color="var(--primary-color)" /></button>
+                  </div>
+                ))}
               </div>
-            ))}
+            ) : (
+              <span style={{ fontSize: '11px', color: 'var(--color-slate)', fontStyle: 'italic' }}>No favorited directories saved yet. Bookmark folders directly inside the File Explorer by clicking the star icon.</span>
+            )}
           </div>
-        )}
+        </div>
       </div>
+    </div>
+  );
+}
 
-      {/* Save / Reset Actions */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 'auto' }}>
-        <button
-          onClick={handleResetAll}
-          className="btn-secondary"
-          style={{ padding: '8px 16px', fontSize: '11px', color: '#EF4444' }}
+
+// ----------------------------------------------------------------------------
+function AboutModal({ isOpen, onClose, theme }) {
+  if (!isOpen) return null;
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.75)',
+      backdropFilter: 'blur(8px)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 99999
+    }} onClick={onClose}>
+      <div 
+        className="glass-card animate-scale-up" 
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: '440px',
+          padding: '30px',
+          borderRadius: '16px',
+          border: '1px solid var(--glass-border)',
+          backgroundColor: 'var(--glass-bg)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          textAlign: 'center',
+          position: 'relative'
+        }}
+      >
+        <button 
+          onClick={onClose}
+          style={{ position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', color: 'var(--color-slate)', cursor: 'pointer' }}
         >
-          Reset All Defaults
+          <X size={18} />
         </button>
-        <button
-          onClick={saveSettings}
-          className="btn-primary"
-          style={{ padding: '8px 16px', fontSize: '11px' }}
-        >
-          Save Settings
-        </button>
+
+        <img src={theme === 'light' ? 'logo_light.png' : 'logo.png'} style={{ height: '60px', marginBottom: '16px', objectFit: 'contain' }} alt="RFINE" />
+        <h2 style={{ fontSize: '20px', fontWeight: '800', color: 'var(--primary-color)', margin: 0 }}>RFINE Media Suite</h2>
+        <span style={{ fontSize: '11px', color: 'var(--color-slate)', marginTop: '4px', fontWeight: 'bold' }}>Version 1.3.0</span>
+
+        <p style={{ fontSize: '12px', color: 'var(--color-white)', opacity: 0.8, lineHeight: '1.6', margin: '20px 0' }}>
+          An all-in-one local processing media suite designed for rapid image scaling, video compression, color palette analysis, document cropping, and file utilities.
+        </p>
+
+        <div style={{ fontSize: '10px', color: 'var(--color-slate)', borderTop: '1px solid var(--glass-border)', paddingTop: '16px', width: '100%' }}>
+          Engineered with React, Electron & FFmpeg • 100% Private & Local
+        </div>
       </div>
     </div>
   );

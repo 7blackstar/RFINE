@@ -1,0 +1,134 @@
+function SettingsTab({ theme, setTheme, openFolderPicker }) {\r\n684:   const [defSaveDir, setDefSaveDir] = 
+useState(() => localStorage.getItem('rfine_def_save_dir') || '');\r\n685:   const [repoPath, setRepoPath] = 
+useState(() => localStorage.getItem('rfine_repo_path') || '7blackstar/RFINE');\r\n686:   const [successSaved, 
+setSuccessSaved] = useState(false);\r\n687: \r\n688:   const [favorites, setFavorites] = useState(() => {\r\n689:     
+try {\r\n690:       return JSON.parse(localStorage.getItem('rfine_favorites')) || [];\r\n691:     } catch {\r\n692:    
+   return [];\r\n693:     }\r\n694:   });\r\n695: \r\n696:   const saveSettings = () => {\r\n697:     
+localStorage.setItem('rfine_def_save_dir', defSaveDir);\r\n698:     localStorage.setItem('rfine_repo_path', 
+repoPath);\r\n699:     setSuccessSaved(true);\r\n700:     setTimeout(() => setSuccessSaved(false), 3000);\r\n701:   
+};\r\n702: \r\n703:   const removeFavorite = (pathToRemove) => {\r\n704:     const updated = favorites.filter(f => f 
+!== pathToRemove);\r\n705:     setFavorites(updated);\r\n706:     localStorage.setItem('rfine_favorites', 
+JSON.stringify(updated));\r\n707:   };\r\n708: \r\n709:   const handleResetAll = () => {\r\n710:     if 
+(window.confirm('Are you sure you want to reset all settings to defaults? This will clear favorites and paths.')) 
+{\r\n711:       localStorage.clear();\r\n712:       setDefSaveDir('');\r\n713:       setFavorites([]);\r\n714:       
+setTheme('dark');\r\n715:       alert('All settings reset to defaults.');\r\n716:     }\r\n717:   };\r\n718: \r\n719:  
+ const handleOpenPicker = () => {\r\n720:     openFolderPicker(defSaveDir, (selectedPath) => {\r\n721:       
+setDefSaveDir(selectedPath);\r\n722:     });\r\n723:   };\r\n724: \r\n725:   return (\r\n726:     <div 
+className=\"animate-fade-in animate-slide-in\" style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 
+'15px', position: 'relative', padding: '24px 30px' }}>\r\n727:       <div>\r\n728:         <h1 style={{ margin: '0 0 
+6px 0', fontSize: '20px', fontWeight: '900', color: 'var(--color-white)' }}>SYSTEM SETTINGS</h1>\r\n729:         <p 
+style={{ color: 'var(--color-slate)', fontSize: '11px', margin: 0 }}>Configure default output targets, favorite 
+workspaces, and theme options.</p>\r\n730:       </div>\r\nThe above content does NOT show the entire file contents. 
+If you need to view any lines of the file which were not shown to complete your task, call this tool again to view 
+those lines.\n"}
+  C:\Users\Jafar\.gemini\antigravity\brain\09188eb5-687a-46b1-81f8-80f4b6e7fe06\.system_generated\logs\transcript.jsonl
+:3969:{"step_index":3915,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-07-15T08:47:24Z"
+,"tool_calls":[{"name":"view_file","args":{"AbsolutePath":"\"c:\\\\Users\\\\Jafar\\\\Documents\\\\Antigravity\\\\rfine\
+\\\client\\\\src\\\\App.jsx\"","EndLine":"860","StartLine":"730","toolAction":"\"Viewing SettingsTab rendering blocks 
+in App.jsx\"","toolSummary":"\"File view\""}}]}
+  C:\Users\Jafar\.gemini\antigravity\brain\09188eb5-687a-46b1-81f8-80f4b6e7fe06\.system_generated\logs\transcript.jsonl
+:3970:{"step_index":3916,"source":"MODEL","type":"VIEW_FILE","status":"DONE","created_at":"2026-07-15T08:47:29Z","conte
+nt":"Created At: 2026-07-15T08:47:29Z\nCompleted At: 2026-07-15T08:47:29Z\nFile Path: 
+`file:///c:/Users/Jafar/Documents/Antigravity/rfine/client/src/App.jsx`\nTotal Lines: 6211\nTotal Bytes: 
+281563\nShowing lines 730 to 860\nThe following code has been modified to include a line number before every line, in 
+the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the 
+line number, colon, and leading space.\n730:       </div>\r\n731: \r\n732:       <div style={{ display: 'grid', 
+gridTemplateColumns: 'minmax(0, 1.12fr) minmax(0, 0.88fr)', gap: '20px', flexGrow: 1, minHeight: 0 }}>\r\n733:         
+{/* Left Card: General & Outputs */}\r\n734:         <div className=\"glass-panel\" style={{ padding: '20px', display: 
+'flex', flexDirection: 'column', gap: '18px', overflowY: 'auto' }}>\r\n735:           <span className=\"form-label\" 
+style={{ fontSize: '12px', fontWeight: 'bold', borderBottom: '1px solid var(--glass-border)', paddingBottom: '6px', 
+marginBottom: '4px', display: 'block', letterSpacing: '0.5px', color: 'var(--color-white)' }}>\r\n736:             
+GENERAL & OUTPUTS\r\n737:           </span>\r\n738: \r\n739:           {/* Theme Selector */}\r\n740:           
+<div>\r\n741:             <span className=\"form-label\" style={{ fontSize: '11px', marginBottom: '6px' }}>Application 
+Theme</span>\r\n742:             <div \r\n743:               onClick={() => setTheme(prev => prev === 'dark' ? 'light' 
+: 'dark')}\r\n744:               className=\"btn-secondary\"\r\n745:               style={{\r\n746:                 
+display: 'flex',\r\n747:                 alignItems: 'center',\r\n748:                 justifyContent: 
+'space-between',\r\n749:                 padding: '8px 12px',\r\n750:                 borderRadius: '8px',\r\n751:     
+            cursor: 'pointer',\r\n752:                 background: 'rgba(255,255,255,0.02)',\r\n753:                 
+borderColor: 'var(--glass-border)',\r\n754:                 height: '36px',\r\n755:                 boxSizing: 
+'border-box'\r\n756:               }}\r\n757:             >\r\n758:               \n<truncated 3579 bytes>\n           
+   const p1 = v1.split('.').map(Number);\r\n826:                       const p2 = v2.split('.').map(Number);\r\n827:   
+                    for (let i = 0; i < Math.max(p1.length, p2.length); i++) {\r\n828:                         const 
+n1 = p1[i] || 0;\r\n829:                         const n2 = p2[i] || 0;\r\n830:                         if (n1 > n2) 
+return 1;\r\n831:                         if (n2 > n1) return -1;\r\n832:                       }\r\n833:              
+         return 0;\r\n834:                     };\r\n835: \r\n836:                     if (latestVersion && 
+compareSemVer(latestVersion, '1.1.0') > 0) {\r\n837:                       alert(`A new update is available!\\nLatest 
+Version: v${latestVersion}\\nCurrent Version: v1.1.0\\n\\nPlease download it from the GitHub release page.`);\r\n838:  
+                   } else {\r\n839:                       alert(`RFINE is up to date! (v1.1.0 is the latest 
+version)`);\r\n840:                     }\r\n841:                   } catch (e) {\r\n842:                     
+alert('Could not check for updates right now: ' + e.message);\r\n843:                   }\r\n844:                 
+}}\r\n845:                 className=\"btn-secondary\"\r\n846:                 style={{ padding: '8px 16px', fontSize: 
+'11px' }}\r\n847:               >\r\n848:                 Check for Updates\r\n849:               </button>\r\n850:    
+           <span style={{ fontSize: '10.5px', color: 'var(--color-slate)' }}>Current version: v1.1.0</span>\r\n851:    
+         </div>\r\n852:           </div>\r\n853: \r\n854:           {successSaved && (\r\n855:             <div 
+className=\"animate-fade-in animate-slide-in\" style={{\r\n856:               background: 'rgba(16, 185, 129, 
+0.08)',\r\n857:               border: '1px solid rgba(16, 185, 129, 0.3)',\r\n858:               padding: '6px 
+12px',\r\n859:               borderRadius: '8px',\r\n860:               display: 'flex',\r\nThe above content does NOT 
+show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, 
+call this tool again to view those lines.\n"}
+  C:\Users\Jafar\.gemini\antigravity\brain\09188eb5-687a-46b1-81f8-80f4b6e7fe06\.system_generated\logs\transcript.jsonl
+:3971:{"step_index":3917,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-07-15T08:47:30Z"
+,"tool_calls":[{"name":"view_file","args":{"AbsolutePath":"\"c:\\\\Users\\\\Jafar\\\\Documents\\\\Antigravity\\\\rfine\
+\\\client\\\\src\\\\App.jsx\"","EndLine":"900","StartLine":"860","toolAction":"\"Viewing SettingsTab footer buttons in 
+App.jsx\"","toolSummary":"\"File view\""}}]}
+  C:\Users\Jafar\.gemini\antigravity\brain\09188eb5-687a-46b1-81f8-80f4b6e7fe06\.system_generated\logs\transcript.jsonl
+:3972:{"step_index":3918,"source":"MODEL","type":"VIEW_FILE","status":"DONE","created_at":"2026-07-15T08:47:35Z","conte
+nt":"Created At: 2026-07-15T08:47:35Z\nCompleted At: 2026-07-15T08:47:35Z\nFile Path: 
+`file:///c:/Users/Jafar/Documents/Antigravity/rfine/client/src/App.jsx`\nTotal Lines: 6211\nTotal Bytes: 
+281563\nShowing lines 860 to 900\nThe following code has been modified to include a line number before every line, in 
+the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the 
+line number, colon, and leading space.\n860:               display: 'flex',\r\n861:               alignItems: 
+'center',\r\n862:               gap: '12px',\r\n863:               marginTop: '5px'\r\n864:             }}>\r\n865:    
+           <CheckCircle size={15} color=\"#10B981\" />\r\n866:               <span style={{ color: '#FFF', fontSize: 
+'11px', fontWeight: 'bold' }}>Settings saved successfully!</span>\r\n867:             </div>\r\n868:           
+)}\r\n869: \r\n870:           <div style={{ marginTop: 'auto', display: 'flex', gap: '10px', paddingTop: '10px' 
+}}>\r\n871:             <button onClick={saveSettings} className=\"btn-primary\" style={{ padding: '8px 16px', 
+fontSize: '11px' }}>\r\n872:               Save Settings\r\n873:             </button>\r\n874:             <button 
+onClick={handleResetAll} className=\"btn-secondary\" style={{ padding: '8px 16px', fontSize: '11px', borderColor: 
+'#EF4444', color: '#EF4444' }}>\r\n875:               Reset Defaults\r\n876:             </button>\r\n877:           
+</div>\r\n878:         </div>\r\n879: \r\n880:         {/* Right Card: Favorite Workspaces */}\r\n881:         <div 
+className=\"glass-panel\" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '15px', overflowY: 
+'auto' }}>\r\n882:           <span className=\"form-label\" style={{ fontSize: '12px', fontWeight: 'bold', 
+borderBottom: '1px solid var(--glass-border)', paddingBottom: '6px', marginBottom: '4px', display: 'block', 
+letterSpacing: '0.5px', color: 'var(--color-white)' }}>\r\n883:             FAVORITE WORKSPACES\r\n884:           
+</span>\r\n885: \r\n886:           {favorites.length === 0 ? (\r\n887:             <div style={{ display: 'flex', 
+flexGrow: 1, alignItems: 'center', justifyContent: 'center', color: 'var(--color-slate)', fontSize: '11.5px', 
+fontStyle: 'italic' }}>\r\n888:               No favorite folders saved yet. Star folders in the file explorer to add 
+them here.\r\n889:             </div>\r\n890:           ) : (\r\n891:             <div style={{ display: 'flex', 
+flexDirection: 'column', gap: '8px', flexGrow: 1, overflowY: 'auto' }}>\r\n892:               {favorites.map((fav) => 
+(\r\n893:                 <div key={fav} style={{ display: 'flex', alignItems: 'center', justifyContent: 
+'space-between', padding: '8px 10px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--glass-border)', 
+borderRadius: '6px' }}>\r\n894:                   <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, 
+flexGrow: 1, marginRight: '10px' }}>\r\n895:                     <span style={{ fontSize: '11px', fontWeight: 'bold', 
+color: 'var(--color-white)' }}>\r\n896:                       {fav.substring(fav.lastIndexOf('\\\\') + 1) || 
+fav}\r\n897:                     </span>\r\n898:                     <span style={{ fontSize: '9px', color: 
+'var(--color-slate)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={fav}>\r\n899:       
+                {fav}\r\n900:                     </span>\r\nThe above content does NOT show the entire file contents. 
+If you need to view any lines of the file which were not shown to complete your task, call this tool again to view 
+those lines.\n"}
+  C:\Users\Jafar\.gemini\antigravity\brain\09188eb5-687a-46b1-81f8-80f4b6e7fe06\.system_generated\logs\transcript.jsonl
+:3973:{"step_index":3919,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-07-15T08:47:35Z"
+,"thinking":"**Positioning UI Elements**\n\nOkay, I'm working on the UI layout for the settings page. I've located the 
+\"Check for Updates\" button and plan to move it below the version name. I'm focusing on aligning the buttons to the 
+right, as requested, to create a cleaner look. I've placed the button and am currently reviewing the flexbox container 
+to correctly position 
+it.\n\n\n","tool_calls":[{"name":"replace_file_content","args":{"AllowMultiple":"false","Description":"\"Right-align 
+updates and action buttons in SettingsTab.\"","EndLine":"878","Instruction":"\"Restructure the updates block and 
+right-align action buttons.\"","ReplacementContent":"\"          {/* Software Updates (GitHub Releases API) */}\\n     
+     <div style={{ borderTop: '1px solid var(--glass-border)', paddingTop: '15px', marginTop: '5px', display: 'flex', 
+flexDirection: 'column', gap: '6px' }}>\\n            <span className=\\\"form-label\\\" style={{ fontSize: '11px', 
+marginBottom: '2px' }}>Application Updates</span>\\n            <span style={{ fontSize: '11px', color: 
+'var(--color-white)', fontWeight: 'bold' }}>Current Version: v1.1.0</span>\\n            \\n            <div style={{ 
+display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>\\n              <button \\n                
+onClick={async () => {\\n                  try {\\n                    const targetRepo = '7blackstar/RFINE';\\n       
+             const res = await fetch(`https://api.github.com/repos/${targetRepo}/releases/latest`);\\n                 
+   if (res.status === 404) {\\n                      alert(`Could not check for updates:\\\\nThe GitHub repository 
+'${targetRepo}' does not exist or has no published releases yet.\\\\n\\\\nMake sure the repository is public and 
+contains at least one release.`);\\n                      return;\\n                    }\\n                    if 
+(!res.ok) throw new Error('Repository release metadata not found');\\n                    const data = await 
+res.json();\\n                    const latestVersion = data.tag_name ? data.tag_name.replace('v', '') : '';\\n        
+            \\n                    const compareSemVer = (v1, v2) => {\\n                      const p1 = 
+v1.split('.').map(Number);\\n                      const p2 = v2.split('.').map(Number);\\n                      for 
+(let i = 0; i < Math.max(p1.length, p2.length); i++) {\\n                        const n1 = p1[i] || 0;\\n             
+           const n2 = p2[i] || 0;\\n                        if (n1 > n2) return 1;\\n                        if (n2 > 
+n1) return -

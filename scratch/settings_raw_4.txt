@@ -1,0 +1,135 @@
+function SettingsTab({ theme, setTheme }) {\n289:   const [imgDir, 
+setImgDir] = useState(() => localStorage.getItem('rfine_def_image_dir') || '');\n290:   const [vidDir, setVidDir] = 
+useState(() => localStorage.getItem('rfine_def_video_dir') || '');\n291:   const [renDir, setRenDir] = useState(() => 
+localStorage.getItem('rfine_def_rename_dir') || '');\n292:   \n293:   // Folder picker modal states\n294:   const 
+[pickerOpen, setPickerOpen] = useState(false);\n295:   const [pickerTarget, setPickerTarget] = useState(''); // 
+'image', 'video', 'rename'\n296:   const [activePickerPath, setActivePickerPath] = useState('');\n297: \n298:   const 
+[favorites, setFavorites] = useState(() => {\n299:     try {\n300:       return 
+JSON.parse(localStorage.getItem('rfine_favorites')) || [];\n301:     } catch {\n302:       return [];\n303:     
+}\n304:   });\n305: \n306:   const saveSettings = () => {\n307:     localStorage.setItem('rfine_def_image_dir', 
+imgDir);\n308:     localStorage.setItem('rfine_def_video_dir', vidDir);\n309:     
+localStorage.setItem('rfine_def_rename_dir', renDir);\n310:     alert('Settings saved successfully!');\n311:   
+};\n312: \n313:   const removeFavorite = (pathToRemove) => {\n314:     const updated = favorites.filter(f => f !== 
+pathToRemove);\n315:     setFavorites(updated);\n316:     localStorage.setItem('rfine_favorites', 
+JSON.stringify(updated));\n317:   };\n318: \n319:   const handleResetAll = () => {\n320:     if (window.confirm('Are 
+you sure you want to reset all settings to defaults? This will clear favorites and paths.')) {\n321:       
+localStorage.clear();\n322:       setImgDi\n<truncated 178 bytes>\n }\n329:   };\n330: \n331:   const handleOpenPicker 
+= (target, currentVal) => {\n332:     setPickerTarget(target);\n333:     setActivePickerPath(currentVal);\n334:     
+setPickerOpen(true);\n335:   };\n336: \n337:   const handleSelectFolder = () => {\n338:     if (pickerTarget === 
+'image') setImgDir(activePickerPath);\n339:     else if (pickerTarget === 'video') setVidDir(activePickerPath);\n340:  
+   else if (pickerTarget === 'rename') setRenDir(activePickerPath);\n341:     setPickerOpen(false);\n342:   };\n343: 
+\n344:   return (\n345:     <div className=\"animate-fade-in animate-slide-in\" style={{ display: 'flex', 
+flexDirection: 'column', height: '100%', gap: '15px', position: 'relative' }}>\n346:       <div>\n347:         <h1 
+style={{ margin: '0 0 6px 0', fontSize: '20px', fontWeight: '900', color: 'var(--color-white)' }}>SYSTEM 
+SETTINGS</h1>\n348:         <p style={{ color: 'var(--color-slate)', fontSize: '11px', margin: 0 }}>Configure default 
+output targets, favorite workspaces, and theme options.</p>\n349:       </div>\n350: \n351:       <div style={{ 
+display: 'grid', gridTemplateColumns: 'minmax(0, 1.12fr) minmax(0, 0.88fr)', gap: '20px', flexGrow: 1, minHeight: 0 
+}}>\n352:         {/* Left Card: General & Outputs */}\n353:         <div className=\"glass-panel\" style={{ padding: 
+'20px', display: 'flex', flexDirection: 'column', gap: '18px', overflowY: 'auto' }}>\n354:           <span 
+className=\"form-label\" style={{ fontSize: '12px', fontWeight: 'bold', borderBottom: '1px solid var(--glass-border)', 
+paddingBottom: '6px', marginBottom: '4px', display: 'block', letterSpacing: '0.5px', color: 'var(--color-white)' 
+}}>\n355:             GENERAL & OUTPUTS\n356:           </span>\n357: \n358:           {/* Theme Selector */}\n359:    
+       <div>\n360:             <span className=\"form-label\" style={{ fontSize: '11px', marginBottom: '6px' 
+}}>Application Theme</span>\nThe above content does NOT show the entire file contents. If you need to view any lines 
+of the file which were not shown to complete your task, call this tool again to view those lines.\n"}
+  C:\Users\Jafar\.gemini\antigravity\brain\09188eb5-687a-46b1-81f8-80f4b6e7fe06\.system_generated\logs\transcript.jsonl
+:1911:{"step_index":1834,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-07-14T09:38:25Z"
+,"tool_calls":[{"name":"view_file","args":{"AbsolutePath":"\"c:\\\\Users\\\\Jafar\\\\Documents\\\\Antigravity\\\\rfine\
+\\\client\\\\src\\\\App.jsx\"","EndLine":"450","StartLine":"361","toolAction":"\"Viewing SettingsTab default path 
+inputs in App.jsx\"","toolSummary":"\"File view\""}}]}
+  C:\Users\Jafar\.gemini\antigravity\brain\09188eb5-687a-46b1-81f8-80f4b6e7fe06\.system_generated\logs\transcript.jsonl
+:1912:{"step_index":1835,"source":"MODEL","type":"VIEW_FILE","status":"DONE","created_at":"2026-07-14T09:38:30Z","conte
+nt":"Created At: 2026-07-14T09:38:30Z\nCompleted At: 2026-07-14T09:38:31Z\nFile Path: 
+`file:///c:/Users/Jafar/Documents/Antigravity/rfine/client/src/App.jsx`\nTotal Lines: 3281\nTotal Bytes: 
+141568\nShowing lines 361 to 450\nThe following code has been modified to include a line number before every line, in 
+the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the 
+line number, colon, and leading space.\n361:             <div \n362:               onClick={() => setTheme(prev => 
+prev === 'dark' ? 'light' : 'dark')}\n363:               className=\"btn-secondary\"\n364:               
+style={{\n365:                 display: 'flex',\n366:                 alignItems: 'center',\n367:                 
+justifyContent: 'space-between',\n368:                 padding: '8px 12px',\n369:                 borderRadius: 
+'8px',\n370:                 cursor: 'pointer',\n371:                 background: 'rgba(255,255,255,0.02)',\n372:      
+           borderColor: 'var(--glass-border)',\n373:                 height: '36px',\n374:                 boxSizing: 
+'border-box'\n375:               }}\n376:             >\n377:               <span style={{ fontSize: '11px', 
+fontWeight: 'bold', color: 'var(--color-white)' }}>\n378:                 {theme === 'dark' ? 'Dark Mode' : 'Light 
+Mode'}\n379:               </span>\n380:               <div style={{\n381:                 position: 'relative',\n382: 
+                width: '32px',\n383:                 height: '16px',\n384:                 borderRadius: '8px',\n385:  
+               background: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.1)',\n386:                 
+border: '1px solid var(--glass-border)'\n387:               }}>\n388:                 <div style={{\n389:              
+     position: 'absolute',\n390:                   top: '1px',\n391:                   left: theme === 'dark' ? '17px' 
+: '1px',\n392:                   width: '12px',\n393:                   height: '12px',\n394:                   
+borderRadius: '50%',\n395:                   background: 'v\n<truncated 683 bytes>\n     value={imgDir} \n412:         
+        style={{ padding: '8px', fontSize: '11px', flexGrow: 1, background: 'rgba(0,0,0,0.1)', cursor: 'default' 
+}}\n413:               />\n414:               <button \n415:                 onClick={() => handleOpenPicker('image', 
+imgDir)}\n416:                 className=\"btn-secondary\"\n417:                 style={{ padding: '8px 12px', 
+fontSize: '11px', whiteSpace: 'nowrap' }}\n418:               >\n419:                 Browse...\n420:               
+</button>\n421:             </div>\n422:           </div>\n423: \n424:           {/* Default Video Output */}\n425:    
+       <div>\n426:             <span className=\"form-label\" style={{ fontSize: '11px', marginBottom: '4px' 
+}}>Default Video Compressor Output Path</span>\n427:             <div style={{ display: 'flex', gap: '8px' }}>\n428:   
+            <input \n429:                 type=\"text\" \n430:                 className=\"form-input\" \n431:         
+        readOnly\n432:                 placeholder=\"No default path configured\"\n433:                 value={vidDir} 
+\n434:                 style={{ padding: '8px', fontSize: '11px', flexGrow: 1, background: 'rgba(0,0,0,0.1)', cursor: 
+'default' }}\n435:               />\n436:               <button \n437:                 onClick={() => 
+handleOpenPicker('video', vidDir)}\n438:                 className=\"btn-secondary\"\n439:                 style={{ 
+padding: '8px 12px', fontSize: '11px', whiteSpace: 'nowrap' }}\n440:               >\n441:                 
+Browse...\n442:               </button>\n443:             </div>\n444:           </div>\n445: \n446:           {/* 
+Default Rename Output */}\n447:           <div>\n448:             <span className=\"form-label\" style={{ fontSize: 
+'11px', marginBottom: '4px' }}>Default File Renamer Output Path</span>\n449:             <div style={{ display: 
+'flex', gap: '8px' }}>\n450:               <input \nThe above content does NOT show the entire file contents. If you 
+need to view any lines of the file which were not shown to complete your task, call this tool again to view those 
+lines.\n"}
+  C:\Users\Jafar\.gemini\antigravity\brain\09188eb5-687a-46b1-81f8-80f4b6e7fe06\.system_generated\logs\transcript.jsonl
+:1913:{"step_index":1836,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-07-14T09:38:31Z"
+,"thinking":"**Examining Output Paths**\n\nI'm now diving into how the output paths are saved and processed. It 
+appears `SettingsTab` manages distinct paths for image, video, and file renamer outputs, specifically via 
+`rfine_def_image_dir`, `rfine_def_video_dir`, and `rfine_def_rename_dir` 
+respectively.\n\n\n","tool_calls":[{"name":"run_command","args":{"CommandLine":"\"powershell -Command \\\"(Get-Content 
+'c:\\\\Users\\\\Jafar\\\\Documents\\\\Antigravity\\\\rfine\\\\server\\\\index.js' | Select-String -Pattern 'video/compr
+ess-local').LineNumber\\\"\"","Cwd":"\"c:\\\\Users\\\\Jafar\\\\Documents\\\\Antigravity\\\\rfine\"","WaitMsBeforeAsync"
+:"8000","toolAction":"\"Finding line number of video compress-local route in index.js\"","toolSummary":"\"Command 
+execution\""}}]}
+  C:\Users\Jafar\.gemini\antigravity\brain\09188eb5-687a-46b1-81f8-80f4b6e7fe06\.system_generated\logs\transcript.jsonl
+:1914:{"step_index":1837,"source":"MODEL","type":"RUN_COMMAND","status":"DONE","created_at":"2026-07-14T09:38:36Z","con
+tent":"Created At: 2026-07-14T09:38:36Z\nCompleted At: 2026-07-14T09:38:37Z\n\n\t\t\t\tThe command completed 
+successfully.\n\t\t\t\tOutput:\n\t\t\t\t668\r\n\n"}
+  C:\Users\Jafar\.gemini\antigravity\brain\09188eb5-687a-46b1-81f8-80f4b6e7fe06\.system_generated\logs\transcript.jsonl
+:1915:{"step_index":1838,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-07-14T09:38:38Z"
+,"tool_calls":[{"name":"view_file","args":{"AbsolutePath":"\"c:\\\\Users\\\\Jafar\\\\Documents\\\\Antigravity\\\\rfine\
+\\\server\\\\index.js\"","EndLine":"710","StartLine":"660","toolAction":"\"Viewing video compress-local route code in 
+index.js\"","toolSummary":"\"File view\""}}]}
+  C:\Users\Jafar\.gemini\antigravity\brain\09188eb5-687a-46b1-81f8-80f4b6e7fe06\.system_generated\logs\transcript.jsonl
+:1916:{"step_index":1839,"source":"MODEL","type":"VIEW_FILE","status":"DONE","created_at":"2026-07-14T09:38:44Z","conte
+nt":"Created At: 2026-07-14T09:38:44Z\nCompleted At: 2026-07-14T09:38:45Z\nFile Path: 
+`file:///c:/Users/Jafar/Documents/Antigravity/rfine/server/index.js`\nTotal Lines: 749\nTotal Bytes: 23813\nShowing 
+lines 660 to 710\nThe following code has been modified to include a line number before every line, in the format: 
+<line_number>: <original_line>. Please note that any changes targeting the original code should remove the line 
+number, colon, and leading space.\n660:     });\n661:   } catch (error) {\n662:     if (fs.existsSync(inputPath)) 
+fs.unlinkSync(inputPath);\n663:     res.status(500).json({ error: error.message });\n664:   }\n665: });\n666: \n667: 
+// Video compression from local Windows path directly\n668: app.post('/api/video/compress-local', (req, res) => 
+{\n669:   const { localPath, format = 'mp4', crf = 23, scale = '1280:720', outputFolder, muteAudio, preset = 'medium' 
+} = req.body;\n670: \n671:   if (!ffmpegPathDetected) {\n672:     return res.status(500).json({ error: 'FFmpeg is not 
+installed or available in path.' });\n673:   }\n674:   if (!localPath || !fs.existsSync(localPath)) {\n675:     return 
+res.status(404).json({ error: 'File not found' });\n676:   }\n677: \n678:   const parsed = 
+path.parse(localPath);\n679:   let targetDir = outputFolder ? outputFolder.trim() : parsed.dir;\n680:   try {\n681:    
+ if (!fs.existsSync(targetDir)) {\n682:       fs.mkdirSync(targetDir, { recursive: true });\n683:     }\n684:   } 
+catch (e) {\n685:     targetDir = parsed.dir;\n686:   }\n687: \n688:   const outputName = 
+`${parsed.name}_compressed.${format}`;\n689:   const outputPath = path.join(targetDir, outputName);\n690: \n691:   try 
+{\n692:     let command = ffmpeg(localPath)\n693:       .output(outputPath)\n694:       .outputOptions('-crf', 
+String(crf))\n695:       .outputOptions('-preset', preset)\n696:       .on('error', (err) => console.error(err))\n697: 
+      .on('end', () => console.log('Finished compressing local file!'));\n698: \n699:     if (scale && scale !== 
+'original') {\n700:       command = command.size(scale);\n701:     }\n702: \n703:     if (muteAudio) {\n704:       
+command = command.noAudio(); // Removes audio track entirely\n705:     }\n706: \n707:     if (format === 'webm') 
+{\n708:       command = command.videoCodec('libvpx-vp9');\n709:       if (!muteAudio) command = 
+command.audioCodec('libvorbis');\n710:     } else {\nThe above content does NOT show the entire file contents. If you 
+need to view any lines of the file which were not shown to complete your task, call this tool again to view those 
+lines.\n"}
+  C:\Users\Jafar\.gemini\antigravity\brain\09188eb5-687a-46b1-81f8-80f4b6e7fe06\.system_generated\logs\transcript.jsonl
+:1917:{"step_index":1840,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-07-14T09:38:45Z"
+,"thinking":"**Leveraging Built-in Capabilities**\n\nI've been examining `index.js`, specifically line 679. I realized 
+the backend *already* handles defaulting the output directory to the input file's directory when `outputFolder` is 
+absent. This is a significant finding because we can use this functionality! I'm now thinking how to best leverage 
+this in the client-side implementation.\n\n\n**Implementing Output Selector**\n\nI've sketched out a clean UI element: 
+a \"Save Destination\" selector with options for saving in the original file's folder (implemented by passing 
+`outputFolder: \"\"`), the default settings folder, or a custom location via a folder browser. This aligns with user 
+needs and utilizes the existing backend functionality efficiently. I'm now verifying the approach and incorporating a 
+new \"Output Mode\" setting in `SettingsTab` with a `rfine_output_mode` key (unified/separate) and a unified directory 
+key `rfine_def_unified_dir`. This will accommodate settings across modules.\n\n\n**Designing Ou

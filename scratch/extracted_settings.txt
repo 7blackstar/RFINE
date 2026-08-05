@@ -1,0 +1,60 @@
+function SettingsTab({ theme, setTheme 
+}) {
+  const [imgDir, setImgDir] = useState(() => localStorage.getItem('rfine_def_image_dir') || '');
+  const 
+[vidDir, setVidDir] = useState(() => localStorage.getItem('rfine_def_video_dir') || '');
+  const [renDir, setRenDir] 
+= useState(() => localStorage.getItem('rfine_def_rename_dir') || '');
+  const [favorites, setFavorites] = 
+useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('rfine_favorites')) || [];
+    } catch 
+{
+      return [];
+    }
+  });
+
+  const saveSettings = () => {
+    
+localStorage.setItem('rfine_def_image_dir', imgDir);
+    localStorage.setItem('rfine_def_video_dir', vidDir);
+    
+localStorage.setItem('rfine_def_rename_dir', renDir);
+    alert('Settings saved successfully!');
+  };
+
+  const 
+removeFavorite = (pathToRemove) => {
+    const updated = favorites.filter(f => f !== pathToRemove);
+    
+setFavorites(updated);
+    localStorage.setItem('rfine_favorites', JSON.stringify(updated));
+  };
+
+  const 
+handleResetAll = () => {
+    if (window.confirm('Are you sure you want to reset all settings to defaults? This will 
+clear favorites and paths.')) {
+      localStorage.clear();
+      setImgDir('');
+      setVidDir('');
+      
+setRenDir('');
+      setFavorites([]);
+      setTheme('dark');
+      alert('All settings reset to 
+defaults.');
+    }
+  };
+
+  return (
+    <div className="animate-fade-in animate-slide-in" style={{ 
+display: 'flex', flexDirection: 'column', height: '100%', gap: '15px' }}>
+      <div>
+        <h1 style={{ margin: 
+'0 0 6px 0', fontSize: '20px', fontWeight: '900', color: 'var(--color-white)' }}>SYSTEM SETTINGS</h1>
+        <p 
+style={{ color: 'var(--color-slate)', fontSize: '11px', margin: 0 }}>Configure default output targets, favorite 
+workspaces, and t
+<truncated 7022 bytes>","StartLine":"276","TargetContent":""}

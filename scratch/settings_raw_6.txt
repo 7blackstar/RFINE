@@ -1,0 +1,134 @@
+function SettingsTab({ theme, setTheme }) {\\n  const [outputMode, setOutputMode] = 
+useState(() => localStorage.getItem('rfine_output_mode') || 'separate');\\n  const [unifiedDir, setUnifiedDir] = 
+useState(() => localStorage.getItem('rfine_def_unified_dir') || '');\\n  const [imgDir, setImgDir] = useState(() => 
+localStorage.getItem('rfine_def_image_dir') || '');\\n  const [vidDir, setVidDir] = useState(() => 
+localStorage.getItem('rfine_def_video_dir') || '');\\n  const [renDir, setRenDir] = useState(() => 
+localStorage.getItem('rfine_def_rename_dir') || '');\\n  \\n  // Folder picker modal states\\n  const [pickerOpen, 
+setPickerOpen] = useState(false);\\n  const [pickerTarget, setPickerTarget] = useState(''); // 'unified', 'image', 
+'video', 'rename'\\n  const [activePickerPath, setActivePickerPath] = useState('');\\n\\n  const [favorites, 
+setFavorites] = useState(() => {\\n    try {\\n      return JSON.parse(localStorage.getItem('rfine_favorites')) || 
+[];\\n    } catch {\\n      return [];\\n    }\\n  });\\n\\n  const saveSettings = () => {\\n    
+localStorage.setItem('rfine_output_mode', outputMode);\\n    localStorage.setItem('rfine_def_unified_dir', 
+unifiedDir);\\n    localStorage.setItem('rfine_def_image_dir', imgDir);\\n    
+localStorage.setItem('rfine_def_video_dir', vidDir);\\n    localStorage.setItem('rfine_def_rename_dir', renDir);\\n    
+alert('Settings saved successfully!');\\n  };\\n\\n  const removeFavorite = (pathToRemove) => {\\n    const updated = 
+favorites.filter(f => f !== pathToRemove);\\n    setFavorites(updated);\\n    localStorage.setItem('rfine_favorites', 
+JSON.stringify(updated));\\n  };\\n\\n  const handleResetAll = () => {\\n    if (window.confirm('Are you sure you want 
+to reset all settings to defaults? This will clear favorites and paths.')) {\\n      localStorage.clear();\\n      
+setImgDir('');\\n      setVidDir('');\\n      setRenDir('');\\n      setUnifiedDir('');\\n      
+setOutputMode('separate');\\n      setFavorites([]);\\n      setTheme('dark');\\n      alert('All settings reset to 
+defaults.');\\n    }\\n  };\\n\\n  const handleO\n<truncated 489 bytes>","StartLine":"288","TargetContent":"\"function 
+SettingsTab({ theme, setTheme }) {\\n  const [imgDir, setImgDir] = useState(() => 
+localStorage.getItem('rfine_def_image_dir') || '');\\n  const [vidDir, setVidDir] = useState(() => 
+localStorage.getItem('rfine_def_video_dir') || '');\\n  const [renDir, setRenDir] = useState(() => 
+localStorage.getItem('rfine_def_rename_dir') || '');\\n  \\n  // Folder picker modal states\\n  const [pickerOpen, 
+setPickerOpen] = useState(false);\\n  const [pickerTarget, setPickerTarget] = useState(''); // 'image', 'video', 
+'rename'\\n  const [activePickerPath, setActivePickerPath] = useState('');\\n\\n  const [favorites, setFavorites] = 
+useState(() => {\\n    try {\\n      return JSON.parse(localStorage.getItem('rfine_favorites')) || [];\\n    } catch 
+{\\n      return [];\\n    }\\n  });\\n\\n  const saveSettings = () => {\\n    
+localStorage.setItem('rfine_def_image_dir', imgDir);\\n    localStorage.setItem('rfine_def_video_dir', vidDir);\\n    
+localStorage.setItem('rfine_def_rename_dir', renDir);\\n    alert('Settings saved successfully!');\\n  };\\n\\n  const 
+removeFavorite = (pathToRemove) => {\\n    const updated = favorites.filter(f => f !== pathToRemove);\\n    
+setFavorites(updated);\\n    localStorage.setItem('rfine_favorites', JSON.stringify(updated));\\n  };\\n\\n  const 
+handleResetAll = () => {\\n    if (window.confirm('Are you sure you want to reset all settings to defaults? This will 
+clear favorites and paths.')) {\\n      localStorage.clear();\\n      setImgDir('');\\n      setVidDir('');\\n      
+setRenDir('');\\n      setFavorites([]);\\n      setTheme('dark');\\n      alert('All settings reset to 
+defaults.');\\n    }\\n  };\\n\\n  const handleOpenPicker = (target, currentVal) => {\\n    
+setPickerTarget(target);\\n    setActivePickerPath(currentVal);\\n    setPickerOpen(true);\\n  };\\n\\n  const 
+handleSelectFolder = () => {\\n    if (pickerTarget === 'image') setImgDir(activePickerPath);\\n    else if 
+(pickerTarget === 'video') setVidDir(activePickerPath);\\n    else if (pickerTarget === 'rename') 
+setRenDir(activePickerPath);\\n    setPickerOpen(false);\\n  };\"","TargetFile":"\"c:\\\\Users\\\\Jafar\\\\Documents\\\
+\Antigravity\\\\rfine\\\\client\\\\src\\\\App.jsx\"","toolAction":"\"Adding output modes states and hooks to settings 
+page\"","toolSummary":"\"File edit\""}}]}
+  C:\Users\Jafar\.gemini\antigravity\brain\09188eb5-687a-46b1-81f8-80f4b6e7fe06\.system_generated\logs\transcript.jsonl
+:1922:{"step_index":1845,"source":"MODEL","type":"CODE_ACTION","status":"DONE","created_at":"2026-07-14T09:39:06Z","con
+tent":"Created At: 2026-07-14T09:39:06Z\nCompleted At: 2026-07-14T09:39:06Z\nThe following changes were made by the 
+replace_file_content tool to: c:\\Users\\Jafar\\Documents\\Antigravity\\rfine\\client\\src\\App.jsx. If relevant, 
+proactively run terminal commands to execute this code for the USER. Don't ask for permission.\n[diff_block_start]\n@@ 
+-286,6 +286,8 @@\n // SYSTEM SETTINGS STUDIO (OPTION C - INTEGRATED STORAGE CONFIGURATION)\n // 
+----------------------------------------------------------------------------\n function SettingsTab({ theme, setTheme 
+}) {\n+  const [outputMode, setOutputMode] = useState(() => localStorage.getItem('rfine_output_mode') || 
+'separate');\n+  const [unifiedDir, setUnifiedDir] = useState(() => localStorage.getItem('rfine_def_unified_dir') || 
+'');\n   const [imgDir, setImgDir] = useState(() => localStorage.getItem('rfine_def_image_dir') || '');\n   const 
+[vidDir, setVidDir] = useState(() => localStorage.getItem('rfine_def_video_dir') || '');\n   const [renDir, setRenDir] 
+= useState(() => localStorage.getItem('rfine_def_rename_dir') || '');\n@@ -292,6 +292,6 @@\n   // Folder picker modal 
+states\n   const [pickerOpen, setPickerOpen] = useState(false);\n-  const [pickerTarget, setPickerTarget] = 
+useState(''); // 'image', 'video', 'rename'\n+  const [pickerTarget, setPickerTarget] = useState(''); // 'unified', 
+'image', 'video', 'rename'\n   const [activePickerPath, setActivePickerPath] = useState('');\n \n   const [favorites, 
+setFavorites] = useState(() => {\n@@ -302,6 +302,8 @@\n   });\n \n   const saveSettings = () => {\n+    
+localStorage.setItem('rfine_output_mode', outputMode);\n+    localStorage.setItem('rfine_def_unified_dir', 
+unifiedDir);\n     localStorage.setItem('rfine_def_image_dir', imgDir);\n     
+localStorage.setItem('rfine_def_video_dir', vidDir);\n     localStorage.setItem('rfine_def_rename_dir', renDir);\n@@ 
+-319,6 +319,8 @@\n       setImgDir('');\n       setVidDir('');\n       setRenDir('');\n+      setUnifiedDir('');\n+    
+  setOutputMode('separate');\n       setFavorites([]);\n       setTheme('dark');\n       alert('All settings reset to 
+defaults.');\n@@ -331,7 +331,8 @@\n   };\n \n   const handleSelectFolder = () => {\n-    if (pickerTarget === 'image') 
+setImgDir(activePickerPath);\n+    if (pickerTarget === 'unified') setUnifiedDir(activePickerPath);\n+    else if 
+(pickerTarget === 'image') setImgDir(activePickerPath);\n     else if (pickerTarget === 'video') 
+setVidDir(activePickerPath);\n     else if (pickerTarget === 'rename') setRenDir(activePickerPath);\n     
+setPickerOpen(false);\n[diff_block_end]\n\nPlease note that the above snippet only shows the MODIFIED lines from the 
+last change. It shows up to 3 lines of unchanged lines before and after the modified lines. The actual file contents 
+may have many more lines not shown."}
+  C:\Users\Jafar\.gemini\antigravity\brain\09188eb5-687a-46b1-81f8-80f4b6e7fe06\.system_generated\logs\transcript.jsonl
+:1923:{"step_index":1846,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-07-14T09:39:06Z"
+,"tool_calls":[{"name":"view_file","args":{"AbsolutePath":"\"c:\\\\Users\\\\Jafar\\\\Documents\\\\Antigravity\\\\rfine\
+\\\client\\\\src\\\\App.jsx\"","EndLine":"475","StartLine":"420","toolAction":"\"Viewing SettingsTab default path 
+fields to replace them with unified/separate options\"","toolSummary":"\"File view\""}}]}
+  C:\Users\Jafar\.gemini\antigravity\brain\09188eb5-687a-46b1-81f8-80f4b6e7fe06\.system_generated\logs\transcript.jsonl
+:1924:{"step_index":1847,"source":"MODEL","type":"VIEW_FILE","status":"DONE","created_at":"2026-07-14T09:39:09Z","conte
+nt":"Created At: 2026-07-14T09:39:09Z\nCompleted At: 2026-07-14T09:39:10Z\nFile Path: 
+`file:///c:/Users/Jafar/Documents/Antigravity/rfine/client/src/App.jsx`\nTotal Lines: 3288\nTotal Bytes: 
+142051\nShowing lines 420 to 475\nThe following code has been modified to include a line number before every line, in 
+the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the 
+line number, colon, and leading space.\n420:               />\n421:               <button \n422:                 
+onClick={() => handleOpenPicker('image', imgDir)}\n423:                 className=\"btn-secondary\"\n424:              
+   style={{ padding: '8px 12px', fontSize: '11px', whiteSpace: 'nowrap' }}\n425:               >\n426:                 
+Browse...\n427:               </button>\n428:             </div>\n429:           </div>\n430: \n431:           {/* 
+Default Video Output */}\n432:           <div>\n433:             <span className=\"form-label\" style={{ fontSize: 
+'11px', marginBottom: '4px' }}>Default Video Compressor Output Path</span>\n434:             <div style={{ display: 
+'flex', gap: '8px' }}>\n435:               <input \n436:                 type=\"text\" \n437:                 
+className=\"form-input\" \n438:                 readOnly\n439:                 placeholder=\"No default path 
+configured\"\n440:                 value={vidDir} \n441:                 style={{ padding: '8px', fontSize: '11px', 
+flexGrow: 1, background: 'rgba(0,0,0,0.1)', cursor: 'default' }}\n442:               />\n443:               <button 
+\n444:                 onClick={() => handleOpenPicker('video', vidDir)}\n445:                 
+className=\"btn-secondary\"\n446:                 style={{ padding: '8px 12px', fontSize: '11px', whiteSpace: 'nowrap' 
+}}\n447:               >\n448:                 Browse...\n449:               </button>\n450:             </div>\n451:  
+         </div>\n452: \n453:           {/* Default Rename Output */}\n454:           <div>\n455:             <span 
+className=\"form-label\" style={{ fontSize: '11px', marginBottom: '4px' }}>Default File Renamer Output 
+Path</span>\n456:             <div style={{ display: 'flex', gap: '8px' }}>\n457:               <input \n458:          
+       type=\"text\" \n459:                 className=\"form-input\" \n460:                 readOnly\n461:             
+    placeholder=\"No default path configured\"\n462:                 value={renDir} \n463:                 style={{ 
+padding: '8px', fontSize: '11px', flexGrow: 1, background: 'rgba(0,0,0,0.1)', cursor: 'default' }}\n464:               
+/>\n465:               <button \n466:                 onClick={() => handleOpenPicker('rename', renDir)}\n467:         
+        className=\"btn-secondary\"\n468:                 style={{ padding: '8px 12px', fontSize: '11px', whiteSpace: 
+'nowrap' }}\n469:               >\n470:                 Browse...\n471:               </button>\n472:             
+</div>\n473:           </div>\n474: \n475:           <div style={{ marginTop: 'auto', display: 'flex', gap: '10px', 
+paddingTop: '10px' }}>\nThe above content does NOT show the entire file contents. If you need to view any lines of the 
+file which were not shown to complete your task, call this tool again to view those lines.\n"}
+  C:\Users\Jafar\.gemini\antigravity\brain\09188eb5-687a-46b1-81f8-80f4b6e7fe06\.system_generated\logs\transcript.jsonl
+:1925:{"step_index":1848,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-07-14T09:39:10Z"
+,"tool_calls":[{"name":"view_file","args":{"AbsolutePath":"\"c:\\\\Users\\\\Jafar\\\\Documents\\\\Antigravity\\\\rfine\
+\\\client\\\\src\\\\App.jsx\"","EndLine":"425","StartLine":"395","toolAction":"\"Viewing SettingsTab start of path 
+inputs block in App.jsx\"","toolSummary":"\"File view\""}}]}
+  C:\Users\Jafar\.gemini\antigravity\brain\09188eb5-687a-46b1-81f8-80f4b6e7fe06\.system_generated\logs\transcript.jsonl
+:1926:{"step_index":1849,"source":"MODEL","type":"VIEW_FILE","status":"DONE","created_at":"2026-07-14T09:39:14Z","conte
+nt":"Created At: 2026-07-14T09:39:14Z\nCompleted At: 2026-07-14T09:39:15Z\nFile Path: 
+`file:///c:/Users/Jafar/Documents/Antigravity/rfine/client/src/App.jsx`\nTotal Lines: 3288\nTotal Bytes: 
+142051\nShowing lines 395 to 425\nThe following code has been modified to include a line number before every line, in 
+the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the 
+line number, colon, and leading space.\n395:                 <div style={{\n396:                   position: 
+'absolute',\n397:                   top: '1px',\n398:                   left: theme === 'dark' ? '17px' : '1px',\n399: 
+                  width: '12px',\n400:                   height: '12px',\n401:                   borderRadius: 
+'50%',\n402:                   background: 'var(--primary-gradient)',\n403:                   transition: 'all 0.3s 
+cubic-bezier(0.4, 0, 0.2, 1)'\n404:                 }} />\n405:               </div>\n406:             </div>\n407:    
+       </div>\n408: \n409:           {/* Default Image Output */}\n410:           <div>\n411:             <span 
+className=\"form-label\" style={{ fontSize: '11px', marginBottom: '4px' }}>Default Image Studio Output 
+Path</span>\n412:             <div style={{ display: 'flex', gap: '8px' }}>\n413:               <input \n414:          
+       type=\"text\" \n415:                 className=\"form-input\" \n416:                 readOnly\n417:             
+    placeholder=\"No default path configured\"\n418:                 value={imgDir} \n419:                 style={{ 
+padding: '8px', fontSize: '11px', flexGrow: 1, background: 'rgba(0,0,0,0.1)', cursor: 'default' }}\n420:               
+/>\n421:               <button \n422:                 onClick={() => handleOpenPicker('image', imgDir)}\n423:          
+       className=\"btn-secondary\"\n424:                 style={{ padding: '8px 12px', fontSize: '11px', whiteSpace: 
+'nowrap' }}\n425:               >\nThe above content does NOT show the entire file contents. If you need to view any 
+lines of the file which were not shown to complete your task, call this tool again to view those lines.\n"}
+  C:\Users\Jafar\.gemini\antigravity\brain\09188eb5-687a-46b1-81f8-80f4b6e7fe06\.system_generated\logs\transcript.jsonl
+:1927:{"step_index":1850,"source":"MODEL","type":"PLANNER_RESPONSE","status":"D

@@ -1,0 +1,49 @@
+{/* About Dialog Modal */}
+{isAboutOpen && 
+(
+<div style={{
+position: 'fixed',
+top: 0,
+left: 
+0,
+width: '100vw',
+height: '100vh',
+background: 'rgba(4, 5, 8, 
+0.85)',
+backdropFilter: 'blur(12px)',
+display: 'flex',
+alignItems: 'center',
+justifyContent: 'center',
+zIndex: 999999
+}}>
+<div className="glass-panel animate-fade-in animate-slide-in" style={{
+width: '420px',
+padding: '30px 24px',
+display: 'flex',
+flexDirection: 'column',
+alignItems: 'center',
+textAlign: 'center',
+gap: '16px',
+position: 'relative'
+}}>
+<button onClick={() => setIsAboutOpen(false)}
+className="btn-secondary 
+flex-center"
+style={{ position: 'absolute', top: '15px', right: '15px', padding: '6px', 
+borderRadius: '50%', width: '28px', height: '28px', justifyContent: 'center' }}
+title="Close"
+>
+<X size={14} />
+</button>
+{/* RFINE Logo */}
+<div style={{ marginBottom: '10px' }}>
+<img src={theme === 'light' ? 'logo_light.png' : 'logo.png'} style={{ maxHeight: '42px', width: 'auto' }} 
+alt="RFINE Logo" />
+<span style={{ fontSize: '10px', color: 'var(--primary-color)', display: 
+'block', marginTop: '6px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '2px' }}>
+Refined Media Utilities
+</span>
+The above content does NOT show the entire file 
+contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again 
+to view those lines.
+"}
