@@ -1520,11 +1520,11 @@ function FileExplorer({ onAddFiles, allowedExtensions = [], maxListHeight = null
   const [items, setItems] = useState([]);
   const [explorerError, setExplorerError] = useState('');
   const [selectedItems, setSelectedItems] = useState({});
+  const [lastSelectedIndex, setLastSelectedIndex] = useState(null);
   const [roots, setRoots] = useState({ home: '', drives: [] });
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('name'); // 'name', 'modified', 'size'
   const [sortOrder, setSortOrder] = useState('asc'); // 'asc', 'desc'
-  const fileInputRef = useRef(null);
 
   const [favorites, setFavorites] = useState(() => {
     try {
@@ -1549,6 +1549,7 @@ function FileExplorer({ onAddFiles, allowedExtensions = [], maxListHeight = null
       setParentPath(data.parentPath || '');
       setItems(data.items || []);
       setExplorerError('');
+      setLastSelectedIndex(null);
       if (storageKey) localStorage.setItem(storageKey, data.currentPath);
       if (onPathChange) onPathChange(data.currentPath);
       syncFavorites();
@@ -1575,15 +1576,53 @@ function FileExplorer({ onAddFiles, allowedExtensions = [], maxListHeight = null
     initRootsAndPath();
   }, []);
 
+  const filteredItems = items.filter(item => {
+    if (searchQuery && !item.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    if (item.isDir) return true;
+    if (allowedExtensions.length === 0) return true;
+    return allowedExtensions.includes(item.ext.toLowerCase());
+  });
+
+  const sortedItems = [...filteredItems].sort((a, b) => {
+    if (a.isDir && !b.isDir) return -1;
+    if (!a.isDir && b.isDir) return 1;
+
+    let res = 0;
+    if (sortBy === 'name') {
+      res = a.name.localeCompare(b.name);
+    } else if (sortBy === 'modified') {
+      res = (a.mtime || 0) - (b.mtime || 0);
+    } else if (sortBy === 'size') {
+      res = (a.size || 0) - (b.size || 0);
+    }
+    return sortOrder === 'asc' ? res : -res;
+  });
+
   const handleItemClick = (item, index, e) => {
     if (item.isDir) {
       loadDirectory(item.path);
+      setLastSelectedIndex(null);
       return;
     }
-    setSelectedItems(prev => ({
-      ...prev,
-      [item.path]: prev[item.path] ? null : item
-    }));
+
+    if (e && e.shiftKey && lastSelectedIndex !== null) {
+      const start = Math.min(lastSelectedIndex, index);
+      const end = Math.max(lastSelectedIndex, index);
+      const newSelections = { ...selectedItems };
+      for (let i = start; i <= end; i++) {
+        const targetItem = sortedItems[i];
+        if (targetItem && !targetItem.isDir) {
+          newSelections[targetItem.path] = targetItem;
+        }
+      }
+      setSelectedItems(newSelections);
+    } else {
+      setLastSelectedIndex(index);
+      setSelectedItems(prev => ({
+        ...prev,
+        [item.path]: prev[item.path] ? null : item
+      }));
+    }
     if (onPreviewFile) onPreviewFile(item);
   };
 
@@ -1625,28 +1664,6 @@ function FileExplorer({ onAddFiles, allowedExtensions = [], maxListHeight = null
     }
     return <FileText size={14} color="var(--color-slate)" />;
   };
-
-  const filteredItems = items.filter(item => {
-    if (searchQuery && !item.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    if (item.isDir) return true;
-    if (allowedExtensions.length === 0) return true;
-    return allowedExtensions.includes(item.ext.toLowerCase());
-  });
-
-  const sortedItems = [...filteredItems].sort((a, b) => {
-    if (a.isDir && !b.isDir) return -1;
-    if (!a.isDir && b.isDir) return 1;
-
-    let res = 0;
-    if (sortBy === 'name') {
-      res = a.name.localeCompare(b.name);
-    } else if (sortBy === 'modified') {
-      res = (a.mtime || 0) - (b.mtime || 0);
-    } else if (sortBy === 'size') {
-      res = (a.size || 0) - (b.size || 0);
-    }
-    return sortOrder === 'asc' ? res : -res;
-  });
 
   const handleSelectAll = () => {
     const newSelections = {};
@@ -1715,7 +1732,7 @@ function FileExplorer({ onAddFiles, allowedExtensions = [], maxListHeight = null
       </div>
 
       {/* Row 4: File List Box */}
-      <div style={{ flexGrow: 1, overflowY: 'auto', maxHeight: maxListHeight || '220px', border: '1px solid var(--glass-border)', borderRadius: '6px', background: theme === 'light' ? '#F8FAFC' : 'rgba(0,0,0,0.15)', padding: '4px', display: 'flex', flexDirection: 'column', gap: '2px', minHeight: '100px' }}>
+      <div className="file-explorer-list-box" style={{ flexGrow: 1, overflowY: 'auto', maxHeight: maxListHeight || '220px', border: '1px solid var(--glass-border)', borderRadius: '6px', background: theme === 'light' ? '#F8FAFC' : 'rgba(0,0,0,0.15)', padding: '4px', display: 'flex', flexDirection: 'column', gap: '2px', minHeight: '100px' }}>
         {explorerError ? (
           <div style={{ color: '#EF4444', fontSize: '11px', padding: '10px', textAlign: 'center' }}>{explorerError}</div>
         ) : sortedItems.length === 0 ? (
@@ -1881,8 +1898,8 @@ function ImageResizer({ files, onFilesChange, toggleFileBrowser, isFileBrowserCo
           />
         </CollapsibleFileBrowser>
 
-        {/* Processing Queue Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexShrink: 0, marginTop: '8px' }}>
+        {/* Processing Queue Header with Uniform Spacing */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexShrink: 0, marginTop: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-white)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Processing Queue</span>
             <span style={{ fontSize: '10px', fontWeight: 'bold', background: 'rgba(77, 155, 34, 0.1)', color: 'var(--primary-color)', padding: '2px 8px', borderRadius: '12px' }}>
@@ -1890,29 +1907,32 @@ function ImageResizer({ files, onFilesChange, toggleFileBrowser, isFileBrowserCo
             </span>
           </div>
           {files.length > 0 && (
-            <button className="btn-secondary" style={{ padding: '4px 8px', fontSize: '10px', borderColor: 'transparent', background: 'transparent' }} onClick={() => { onFilesChange([]); setActivePreviewFile(null); setSuccessResult(null); }}>
-              Clear All
+            <button className="btn-secondary" style={{ padding: '4px 8px', fontSize: '10.5px', color: '#EF4444', borderColor: 'transparent', background: 'transparent', fontWeight: 'bold' }} onClick={() => { onFilesChange([]); setActivePreviewFile(null); setSuccessResult(null); }}>
+              Clear Queue
             </button>
           )}
         </div>
 
-        {/* Success Banner */}
+        {/* Success Banner (Square Folder Icon Only) */}
         {successResult && (
-          <div className="animate-fade-in" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'rgba(77, 155, 34, 0.08)', border: '1px solid rgba(77, 155, 34, 0.25)', borderRadius: '6px', fontSize: '11px', color: '#72BC28', fontWeight: 'bold', marginBottom: '12px', gap: '12px', flexShrink: 0 }}>
+          <div className="animate-fade-in" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 14px', background: 'rgba(77, 155, 34, 0.08)', border: '1px solid rgba(77, 155, 34, 0.25)', borderRadius: '6px', fontSize: '11px', color: '#72BC28', fontWeight: 'bold', marginBottom: '12px', gap: '12px', flexShrink: 0 }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <CheckCircle size={14} color="#72BC28" />
               Successfully processed {successResult.count || 1} images!
             </span>
             {successResult.targetFolder && (
-              <button onClick={async () => { try { await fetch(`${API_BASE}/open-folder`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ folderPath: successResult.targetFolder }) }); } catch (e) {} }} className="btn-secondary flex-center" style={{ padding: '4px 10px', gap: '6px', background: 'rgba(0,0,0,0.05)', borderColor: 'var(--glass-border)', color: 'var(--primary-color)', borderRadius: '4px', cursor: 'pointer' }} title="Open Output Folder">
-                <FolderOpen size={14} color="var(--primary-color)" />
-                <span style={{ fontSize: '10.5px' }}>Open Folder</span>
+              <button 
+                onClick={async () => { try { await fetch(`${API_BASE}/open-folder`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ folderPath: successResult.targetFolder }) }); } catch (e) {} }} 
+                style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.05)', border: '1px solid var(--glass-border)', borderRadius: '6px', cursor: 'pointer' }} 
+                title="Open Output Folder"
+              >
+                <FolderOpen size={16} color="var(--primary-color)" />
               </button>
             )}
           </div>
         )}
 
-        {/* Queue Items Box (Exact layout as Screenshot 1) */}
+        {/* Single Contiguous Queue Box */}
         {files.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', border: '1px solid var(--glass-border)', borderRadius: '8px', overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.02)', marginBottom: '12px', flexShrink: 0 }}>
             {files.map((file, idx) => {
@@ -1979,7 +1999,7 @@ function ImageResizer({ files, onFilesChange, toggleFileBrowser, isFileBrowserCo
         </div>
         <p style={{ color: 'var(--color-slate)', fontSize: '11px', margin: '0 0 16px 0' }}>Batch resize and convert images.</p>
 
-        {/* Right Sidebar Preview Box (Matching Screenshot 1) */}
+        {/* Right Sidebar Preview Box */}
         {currentSelectedFile && (() => {
           const fn = typeof currentSelectedFile === 'string' ? path.basename(currentSelectedFile) : currentSelectedFile.name;
           const fp = typeof currentSelectedFile === 'string' ? currentSelectedFile : currentSelectedFile.path;
@@ -2032,7 +2052,7 @@ function ImageResizer({ files, onFilesChange, toggleFileBrowser, isFileBrowserCo
             )}
           </div>
 
-          {/* Section 2: Resize Options (Order: Original Resolution first, Pixels second) */}
+          {/* Section 2: Resize Options */}
           <div style={{ marginBottom: '16px' }}>
             <div onClick={() => setSectionResizeExpanded(!sectionResizeExpanded)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '6px 0', borderBottom: '1px solid var(--glass-border)', marginBottom: '10px' }}>
               <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-white)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Resize Options</span>
@@ -2086,7 +2106,7 @@ function ImageResizer({ files, onFilesChange, toggleFileBrowser, isFileBrowserCo
             )}
           </div>
 
-          {/* Section 3: Target Directory (Custom Button Folder Picker Working) */}
+          {/* Section 3: Target Directory */}
           <div style={{ marginBottom: '16px' }}>
             <div onClick={() => setSectionSaveExpanded(!sectionSaveExpanded)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '6px 0', borderBottom: '1px solid var(--glass-border)', marginBottom: '10px' }}>
               <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-white)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Save Destination</span>
