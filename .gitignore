@@ -1,0 +1,14 @@
+﻿# Binaries & Executables
+RFINE.exe
+*.exe
+*.dll
+*.pak
+*.bin
+*.dat
+
+# Native dependencies & caches
+node_modules/
+resources/app/node_modules/
+.DS_Store
+Thumbs.db
+*.log

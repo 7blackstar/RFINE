@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" >
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap" rel="stylesheet">
+    <title>RFINE Media Processing Suite</title>
+    <script>
+      window.addEventListener('error', function(e) {
+        console.error('Window error:', e.error || e.message);
+        var r = document.getElementById('root');
+        if (r && !r.hasChildNodes()) {
+          var d = document.createElement('div');
+          d.style.cssText = 'color:#ff5555;padding:24px;font-family:sans-serif;background:#1a1c23;height:100vh;box-sizing:border-box;';
+          d.innerHTML = '<h2>Startup / Runtime Error</h2><p style="color:#fff">' + (e.message || e.error) + '</p><pre style="color:#aaa">' + (e.error ? e.error.stack : '') + '</pre>';
+          r.appendChild(d);
+        }
+      });
+      window.addEventListener('unhandledrejection', function(e) {
+        console.error('Unhandled rejection:', e.reason);
+      });
+    </script>
+    <script type="module" src="./assets/index-DiBz0lmQ.js"></script>
+    <link rel="stylesheet" href="./assets/index-DFU3-8KN.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
