@@ -59,7 +59,6 @@ function createWindow() {
     autoHideMenuBar: true
   });
 
-  mainWindow.webContents.openDevTools();
   mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
     console.error(`[MAIN] Page failed to load: ${errorDescription} (${errorCode}) at ${validatedURL}`);
   });

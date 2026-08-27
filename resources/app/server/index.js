@@ -559,10 +559,37 @@ app.post('/api/image/convert-local', async (req, res) => {
       }
 
       const q = parseInt(quality);
-      if (actualFormat === 'webp') pipeline = pipeline.webp({ quality: q });
-      else if (actualFormat === 'avif') pipeline = pipeline.avif({ quality: q });
-      else if (actualFormat === 'jpeg' || actualFormat === 'jpg') pipeline = pipeline.jpeg({ quality: q });
-      else if (actualFormat === 'png') pipeline = pipeline.png({ quality: q });
+      const isLossless = req.body.lossless === true || req.body.lossless === 'true' || q === 100;
+      const compressionEffort = req.body.effort ? parseInt(req.body.effort) : 6;
+
+      if (actualFormat === 'webp') {
+        pipeline = pipeline.webp({
+          quality: isLossless ? 100 : q,
+          lossless: isLossless,
+          effort: compressionEffort,
+          smartSubsample: true,
+          reductionEffort: 6
+        });
+      } else if (actualFormat === 'avif') {
+        pipeline = pipeline.avif({
+          quality: isLossless ? 100 : q,
+          lossless: isLossless,
+          effort: compressionEffort,
+          chromaSubsampling: isLossless ? '4:4:4' : '4:2:0'
+        });
+      } else if (actualFormat === 'jpeg' || actualFormat === 'jpg') {
+        pipeline = pipeline.jpeg({
+          quality: q,
+          mozjpeg: true,
+          progressive: true
+        });
+      } else if (actualFormat === 'png') {
+        pipeline = pipeline.png({
+          compressionLevel: 9,
+          effort: compressionEffort,
+          progressive: true
+        });
+      }
 
       await pipeline.toFile(outputPath);
       const outStat = fs.statSync(outputPath);
