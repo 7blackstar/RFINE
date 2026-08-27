@@ -82,3 +82,192 @@ body:has(.clean-sidebar.collapsed) .global-sticky-bottom-bar,
 .clean-sidebar.collapsed + * .global-sticky-bottom-bar {
   left: 64px !important;
 }
+
+
+/* ======================================================== */
+/* 3-TIER ELEVATION THEME SYSTEM                            */
+/* ======================================================== */
+
+/* --- LIGHT THEME --- */
+:root {
+  --bg-ink: #F3F4F6;
+  --glass-bg: #FFFFFF;
+  --glass-border: #E5E7EB;
+  --glass-hover: #E2E6EA;
+  --card-bg: #EEF0F2;
+  --color-slate: #64748B;
+  --color-light-gray: #334155;
+  --color-white: #0F172A;
+  --shadow-lg: 0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.02);
+}
+
+body {
+  background-color: var(--bg-ink) !important;
+}
+
+.clean-sidebar {
+  background-color: #FFFFFF !important;
+  border-right: 1px solid var(--glass-border) !important;
+}
+
+.glass-panel, .glass-card {
+  background: #FFFFFF !important;
+  border: 1px solid var(--glass-border) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+
+.dropzone, .dropzone-clean, .empty-queue-dropzone, .clean-preset-btn, .form-input {
+  background: #EEF0F2 !important;
+  border-color: #E2E8F0 !important;
+}
+
+.clean-nav-item:hover {
+  background-color: #EEF0F2 !important;
+  color: #0F172A !important;
+}
+
+.global-sticky-bottom-bar {
+  background: #FFFFFF !important;
+  border-top: 1px solid var(--glass-border) !important;
+  border-right: 1px solid var(--glass-border) !important;
+}
+
+
+/* --- DARK THEME --- */
+body.dark-theme {
+  --bg-ink: #0A0A0C !important;
+  --glass-bg: #141417 !important;
+  --glass-border: #26262B !important;
+  --glass-hover: #28282E !important;
+  --card-bg: #1D1D21 !important;
+  --color-slate: #94A3B8 !important;
+  --color-light-gray: #CBD5E1 !important;
+  --color-white: #F8FAFC !important;
+  --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4) !important;
+}
+
+body.dark-theme {
+  background-color: #0A0A0C !important;
+}
+
+body.dark-theme .clean-sidebar {
+  background-color: #141417 !important;
+  border-right: 1px solid #26262B !important;
+}
+
+body.dark-theme .glass-panel,
+body.dark-theme .glass-card {
+  background: #141417 !important;
+  border: 1px solid #26262B !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+
+body.dark-theme .dropzone,
+body.dark-theme .dropzone-clean,
+body.dark-theme .empty-queue-dropzone,
+body.dark-theme .clean-preset-btn,
+body.dark-theme .form-input {
+  background: #1D1D21 !important;
+  border-color: #26262B !important;
+  color: #F8FAFC !important;
+}
+
+body.dark-theme .clean-nav-item:hover,
+body.dark-theme .clean-preset-btn:hover {
+  background-color: #28282E !important;
+  color: #FFFFFF !important;
+}
+
+body.dark-theme .global-sticky-bottom-bar {
+  background: #141417 !important;
+  border-top: 1px solid #26262B !important;
+  border-right: 1px solid #26262B !important;
+}
+
+
+/* ======================================================== */
+
+
+/* ======================================================== */
+
+
+/* ======================================================== */
+/* PREMIUM MINIMAL SEGMENTED CONTROL (GREEN ACCENTED TEXT)  */
+/* ======================================================== */
+
+.clean-preset-btn,
+.clean-tab-btn,
+button.clean-preset-btn {
+  background: #18181C !important;
+  border: 1px solid #28282E !important;
+  color: #8E8E93 !important;
+  border-radius: 7px !important;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  box-shadow: none !important;
+  position: relative !important;
+}
+
+.clean-preset-btn:hover,
+.clean-tab-btn:hover,
+button.clean-preset-btn:hover {
+  background: #202026 !important;
+  border-color: #383842 !important;
+  color: #D1D5DB !important;
+  transform: none !important;
+}
+
+/* Dark Theme Selected Active State - Elevated Matte Surface with Brand Green Text & Icon */
+.clean-preset-btn.active,
+.clean-tab-btn.active,
+button.clean-preset-btn.active,
+body.dark-theme .clean-preset-btn.active,
+body.dark-theme .clean-tab-btn.active,
+body.dark-theme button.clean-preset-btn.active {
+  background: #2E2E36 !important;
+  border: 1px solid #484854 !important;
+  color: #72BC28 !important;
+  font-weight: 800 !important;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+  transform: none !important;
+}
+
+/* Selected Active Icon - Brand Green */
+.clean-preset-btn.active svg,
+button.clean-preset-btn.active svg,
+body.dark-theme .clean-preset-btn.active svg,
+body.dark-theme button.clean-preset-btn.active svg {
+  stroke: #72BC28 !important;
+  color: #72BC28 !important;
+}
+
+/* Light Theme Segmented Control */
+body:not(.dark-theme) .clean-preset-btn,
+body:not(.dark-theme) .clean-tab-btn,
+body:not(.dark-theme) button.clean-preset-btn {
+  background: #EAECEF !important;
+  border: 1px solid #D8DCE2 !important;
+  color: #64748B !important;
+}
+
+body:not(.dark-theme) .clean-preset-btn:hover,
+body:not(.dark-theme) .clean-tab-btn:hover,
+body:not(.dark-theme) button.clean-preset-btn:hover {
+  background: #E2E5E9 !important;
+  color: #1E293B !important;
+}
+
+body:not(.dark-theme) .clean-preset-btn.active,
+body:not(.dark-theme) .clean-tab-btn.active,
+body:not(.dark-theme) button.clean-preset-btn.active {
+  background: #FFFFFF !important;
+  border: 1px solid #CBD5E1 !important;
+  color: #4D9B22 !important;
+  font-weight: 800 !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+}
+
+body:not(.dark-theme) .clean-preset-btn.active svg,
+body:not(.dark-theme) button.clean-preset-btn.active svg {
+  stroke: #4D9B22 !important;
+  color: #4D9B22 !important;
+}
