@@ -281,16 +281,47 @@ body:not(.dark-theme) button.clean-preset-btn.active svg {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px 4px 14px;
-  margin-top: 6px;
+  padding: 7px 12px 6px 12px;
+  margin-top: 8px;
+  margin-bottom: 2px;
   cursor: pointer;
   user-select: none;
-  font-size: 9.5px;
-  font-weight: 800;
-  color: var(--color-slate);
+  font-size: 9px;
+  font-weight: 900;
+  color: var(--primary-color);
+  background: rgba(77, 155, 34, 0.08);
+  border: 1px solid rgba(77, 155, 34, 0.15);
+  border-radius: 6px;
   text-transform: uppercase;
-  letter-spacing: 0.8px;
-  transition: color 0.15s ease;
+  letter-spacing: 0.9px;
+  transition: all 0.15s ease;
+}
+
+body.dark-theme .nav-category-header {
+  color: #72BC28;
+  background: rgba(114, 188, 40, 0.08);
+  border-color: rgba(114, 188, 40, 0.18);
+}
+
+.nav-category-header:hover {
+  background: rgba(77, 155, 34, 0.14);
+  border-color: rgba(77, 155, 34, 0.3);
+}
+
+body.dark-theme .nav-category-header:hover {
+  background: rgba(114, 188, 40, 0.14);
+  border-color: rgba(114, 188, 40, 0.35);
+}
+
+.nav-category-arrow {
+  font-size: 8px;
+  font-weight: 900;
+  color: var(--primary-color);
+  opacity: 0.85;
+}
+
+body.dark-theme .nav-category-arrow {
+  color: #72BC28;
 }
 
 .nav-category-header:hover {
