@@ -1190,6 +1190,106 @@ app.post('/api/update/download-and-install', async (req, res) => {
   }
 });
 
+
+// ==========================================
+// BITMAP IMAGE-TO-VECTOR (SVG) TRACER API
+// ==========================================
+app.post('/api/vector/trace', async (req, res) => {
+  const { filePath, mode = 'single', steps = 4, threshold = 128, turdsize = 2, color = '#000000', background = 'transparent', invert = false, maxWidth = 1600 } = req.body;
+  if (!filePath || !fs.existsSync(filePath)) {
+    return res.status(400).json({ error: 'Valid filePath required' });
+  }
+
+  try {
+    const svgString = await traceImageToSvg(filePath, {
+      mode,
+      steps: parseInt(steps) || 4,
+      threshold: parseInt(threshold),
+      turdsize: parseInt(turdsize),
+      color,
+      background,
+      invert: invert === true || invert === 'true',
+      maxWidth: parseInt(maxWidth) || 1600
+    });
+
+    res.json({
+      success: true,
+      svg: svgString
+    });
+  } catch (err) {
+    console.error('Vector trace error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/vector/convert-local', async (req, res) => {
+  const { files, mode = 'single', steps = 4, threshold = 128, turdsize = 2, color = '#000000', background = 'transparent', invert = false, outputFolder, collisionPolicy = 'auto_rename', fileSuffix = '_vector' } = req.body;
+
+  if (!files || files.length === 0) {
+    return res.status(400).json({ error: 'No files specified' });
+  }
+
+  const results = [];
+
+  for (const file of files) {
+    const inputPath = typeof file === 'string' ? file : file.path;
+    if (!inputPath || !fs.existsSync(inputPath)) {
+      results.push({ name: file.name || path.basename(inputPath || ''), success: false, error: 'File not found' });
+      continue;
+    }
+
+    const parsed = path.parse(inputPath);
+    let targetDir = outputFolder && outputFolder.trim() ? outputFolder.trim() : parsed.dir;
+    try {
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
+      }
+    } catch (e) {
+      targetDir = parsed.dir;
+    }
+
+    const baseName = `${parsed.name}${fileSuffix}.svg`;
+    const initialTargetPath = path.join(targetDir, baseName);
+    const resolved = resolveCollisionPath(initialTargetPath, collisionPolicy);
+
+    if (resolved.skip) {
+      results.push({ name: file.name || parsed.base, success: true, skipped: true, outputPath: resolved.path, targetFolder: targetDir });
+      continue;
+    }
+
+    const finalTargetPath = resolved.path;
+
+    try {
+      const svgString = await traceImageToSvg(inputPath, {
+        mode,
+        steps: parseInt(steps) || 4,
+        threshold: parseInt(threshold),
+        turdsize: parseInt(turdsize),
+        color,
+        background,
+        invert: invert === true || invert === 'true'
+      });
+
+      fs.writeFileSync(finalTargetPath, svgString, 'utf8');
+      const outStat = fs.statSync(finalTargetPath);
+
+      results.push({
+        name: file.name || parsed.base,
+        success: true,
+        originalSize: file.size || outStat.size,
+        optimizedSize: outStat.size,
+        outputPath: finalTargetPath,
+        targetFolder: targetDir
+      });
+    } catch (err) {
+      console.error('Vector tracing error on file:', inputPath, err);
+      results.push({ name: file.name || parsed.base, success: false, error: err.message });
+    }
+  }
+
+  res.json({ results });
+});
+
 function startListening() {
   const srv = app.listen(port, () => {
     console.log(`RFINE local server listening at http://localhost:${port}`);
