@@ -1,3 +1,4 @@
+import { traceImageToSvg } from './vector_tracer.js';
 import express from 'express';
 import cors from 'cors';
 import fs from 'fs';
@@ -1119,125 +1120,17 @@ app.post('/api/gif/create', (req, res) => {
 });
 
 function startListening() {
-  const server = 
-// ==========================================
-// 1-CLICK SILENT AUTO-UPDATER API
-// ==========================================
-app.get('/api/update/check', async (req, res) => {
-  try {
-    const fetch = globalThis.fetch || require('node-fetch');
-    const response = await fetch('https://api.github.com/repos/7blackstar/RFINE/releases/latest', {
-      headers: { 'User-Agent': 'RFINE-AutoUpdater' }
-    });
-    if (!response.ok) {
-      return res.status(response.status).json({ error: 'GitHub API unavailable' });
-    }
-    const data = await response.json();
-    const latestTag = data.tag_name ? data.tag_name.replace('v', '') : '';
-    const currentVersion = '1.3.3';
-
-    // Compare semantic versions:
-    const cmp = (v1, v2) => {
-      const p1 = v1.split('.').map(Number);
-      const p2 = v2.split('.').map(Number);
-      for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
-        const n1 = p1[i] || 0, n2 = p2[i] || 0;
-        if (n1 > n2) return 1;
-        if (n2 > n1) return -1;
-      }
-      return 0;
-    };
-
-    const hasUpdate = latestTag ? cmp(latestTag, currentVersion) > 0 : false;
-    const asset = (data.assets || []).find(a => a.name.endsWith('.exe')) || null;
-    const downloadUrl = asset ? asset.browser_download_url : `https://github.com/7blackstar/RFINE/releases/download/v${latestTag}/RFINE-Setup-${latestTag}.exe`;
-
-    res.json({
-      currentVersion,
-      latestVersion: latestTag || currentVersion,
-      hasUpdate,
-      releaseName: data.name || `v${latestTag}`,
-      releaseNotes: data.body || '',
-      downloadUrl
-    });
-  } catch (err) {
-    console.error('Update check error:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/update/download-and-install', async (req, res) => {
-  const { downloadUrl, version } = req.body;
-  if (!downloadUrl) {
-    return res.status(400).json({ error: 'No downloadUrl provided' });
-  }
-
-  const os = require('os');
-  const https = require('https');
-  const http = require('http');
-  const { spawn } = require('child_process');
-
-  const tempInstallerPath = path.join(os.tmpdir(), `RFINE-Setup-${version || 'update'}.exe`);
-  console.log('[AUTO-UPDATER] Downloading update to:', tempInstallerPath);
-
-  const fileStream = fs.createWriteStream(tempInstallerPath);
-
-  const downloadFile = (url, cb) => {
-    const client = url.startsWith('https') ? https : http;
-    client.get(url, (response) => {
-      // Follow redirects (GitHub releases redirect to AWS S3)
-      if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
-        return downloadFile(response.headers.location, cb);
-      }
-      if (response.statusCode !== 200) {
-        return cb(new Error(`Download failed with HTTP ${response.statusCode}`));
-      }
-      response.pipe(fileStream);
-      fileStream.on('finish', () => {
-        fileStream.close(() => cb(null, tempInstallerPath));
-      });
-    }).on('error', (err) => {
-      fs.unlink(tempInstallerPath, () => {});
-      cb(err);
-    });
-  };
-
-  downloadFile(downloadUrl, (err, filePath) => {
-    if (err) {
-      console.error('[AUTO-UPDATER] Download error:', err);
-      return res.status(500).json({ error: err.message });
-    }
-
-    console.log('[AUTO-UPDATER] Download complete! Launching silent installer and closing current app...');
-    res.json({ success: true, message: 'Installer downloaded. Installing update...' });
-
-    // Launch the 1-click installer detached and quit current instance:
-    setTimeout(() => {
-      try {
-        const child = spawn(filePath, ['/S', '--updated'], {
-          detached: true,
-          stdio: 'ignore'
-        });
-        child.unref();
-        process.exit(0);
-      } catch (e) {
-        console.error('[AUTO-UPDATER] Launch error:', e);
-      }
-    }, 1200);
-  });
-});
-
-app.listen(port, () => {
+  const srv = app.listen(port, () => {
     console.log(`RFINE local server listening at http://localhost:${port}`);
   });
 
-  server.on('error', (err) => {
+  srv.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
       console.log(`Port ${port} in use. Clearing port 5001...`);
       try {
         const { execSync } = require('child_process');
         if (process.platform === 'win32') {
-          execSync(`cmd /c "for /f \\"tokens=5\\" %a in ('netstat -aon ^| findstr :5001') do taskkill /f /pid %a"`, { stdio: 'ignore' });
+          execSync(`cmd /c "for /f \\\"tokens=5\\\" %a in ('netstat -aon ^| findstr :5001') do taskkill /f /pid %a"`, { stdio: 'ignore' });
         }
       } catch (e) {}
       setTimeout(() => startListening(), 500);
