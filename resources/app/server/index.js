@@ -1119,6 +1119,77 @@ app.post('/api/gif/create', (req, res) => {
   }
 });
 
+
+// ==========================================
+// AUTO-UPDATER API (DOWNLOAD & SILENT INSTALL)
+// ==========================================
+app.get('/api/update/check', async (req, res) => {
+  try {
+    const ghRes = await fetch('https://api.github.com/repos/7blackstar/RFINE/releases/latest', {
+      headers: { 'User-Agent': 'RFINE-AutoUpdater' }
+    });
+    if (!ghRes.ok) {
+      return res.status(500).json({ error: 'Failed to contact release server' });
+    }
+    const release = await ghRes.json();
+    const tag = release.tag_name || '';
+    const latestVersion = tag.replace(/^v/, '').trim();
+    const currentVersion = '1.3.4';
+
+    // Standard direct installer URL as requested:
+    // https://github.com/7blackstar/RFINE/releases/download/{tag}/RFINE_Setup.exe
+    const downloadUrl = `https://github.com/7blackstar/RFINE/releases/download/${tag}/RFINE_Setup.exe`;
+
+    const updateAvailable = latestVersion !== '' && latestVersion !== currentVersion;
+
+    res.json({
+      success: true,
+      currentVersion,
+      latestVersion,
+      updateAvailable,
+      downloadUrl,
+      releaseNotes: release.body || ''
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/update/download-and-install', async (req, res) => {
+  const { downloadUrl, version } = req.body;
+  const targetUrl = downloadUrl || `https://github.com/7blackstar/RFINE/releases/download/v${version || '1.3.4'}/RFINE_Setup.exe`;
+
+  try {
+    const tempDir = os.tmpdir();
+    const installerPath = path.join(tempDir, `RFINE_Setup_${Date.now()}.exe`);
+
+    const response = await fetch(targetUrl);
+    if (!response.ok) {
+      return res.status(500).json({ error: `Failed to download update binary (${response.statusText})` });
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    fs.writeFileSync(installerPath, buffer);
+
+    res.json({ success: true, message: 'Installer downloaded. Launching update...' });
+
+    // Launch silent installer and terminate current instance cleanly:
+    setTimeout(() => {
+      try {
+        const { spawn } = require('child_process');
+        spawn(installerPath, ['/S'], { detached: true, stdio: 'ignore' }).unref();
+        setTimeout(() => process.exit(0), 1000);
+      } catch (e) {
+        console.error('Launch installer error:', e);
+      }
+    }, 1500);
+
+  } catch (err) {
+    console.error('Download and install error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 function startListening() {
   const srv = app.listen(port, () => {
     console.log(`RFINE local server listening at http://localhost:${port}`);
