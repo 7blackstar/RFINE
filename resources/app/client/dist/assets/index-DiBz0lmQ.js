@@ -145,7 +145,10 @@ function VectorStudio({files:e,setFiles:t,setGlobalProgress:n,explorerPreviewFil
   let[isExpCol,setIsExpCol]=(0,v.useState)(()=>localStorage.getItem("rfine_explorer_collapsed")==="true");
   let[threshold,setThreshold]=(0,v.useState)(()=>parseInt(localStorage.getItem("rfine_vec_threshold"))||128);
   let[turdsize,setTurdsize]=(0,v.useState)(()=>parseInt(localStorage.getItem("rfine_vec_turdsize"))||2);
-  let[color,setColor]=(0,v.useState)(()=>localStorage.getItem("rfine_vec_color")||"brand");
+  let[colorMode,setColorMode]=(0,v.useState)(()=>localStorage.getItem("rfine_vec_colormode")||"original");
+  let[posterizeSteps,setPosterizeSteps]=(0,v.useState)(()=>parseInt(localStorage.getItem("rfine_vec_posterize_steps"))||6);
+  let[greyPercent,setGreyPercent]=(0,v.useState)(()=>parseInt(localStorage.getItem("rfine_vec_grey_pct"))||50);
+  let[customHex,setCustomHex]=(0,v.useState)(()=>localStorage.getItem("rfine_vec_custom_hex")||"#72BC28");
   let[invert,setInvert]=(0,v.useState)(()=>localStorage.getItem("rfine_vec_invert")==="true");
   let[saveDest,setSaveDest]=(0,v.useState)(()=>localStorage.getItem("rfine_vec_save_dest")||"original");
   let[customDest,setCustomDest]=(0,v.useState)(()=>localStorage.getItem("rfine_vec_custom_dest")||"");
@@ -168,7 +171,10 @@ function VectorStudio({files:e,setFiles:t,setGlobalProgress:n,explorerPreviewFil
 
   (0,v.useEffect)(()=>{localStorage.setItem("rfine_vec_threshold",threshold)},[threshold]);
   (0,v.useEffect)(()=>{localStorage.setItem("rfine_vec_turdsize",turdsize)},[turdsize]);
-  (0,v.useEffect)(()=>{localStorage.setItem("rfine_vec_color",color)},[color]);
+  (0,v.useEffect)(()=>{localStorage.setItem("rfine_vec_colormode",colorMode)},[colorMode]);
+  (0,v.useEffect)(()=>{localStorage.setItem("rfine_vec_posterize_steps",posterizeSteps)},[posterizeSteps]);
+  (0,v.useEffect)(()=>{localStorage.setItem("rfine_vec_grey_pct",greyPercent)},[greyPercent]);
+  (0,v.useEffect)(()=>{localStorage.setItem("rfine_vec_custom_hex",customHex)},[customHex]);
   (0,v.useEffect)(()=>{localStorage.setItem("rfine_vec_invert",String(invert))},[invert]);
   (0,v.useEffect)(()=>{localStorage.setItem("rfine_vec_save_dest",saveDest)},[saveDest]);
   (0,v.useEffect)(()=>{localStorage.setItem("rfine_vec_custom_dest",customDest)},[customDest]);
@@ -201,7 +207,18 @@ function VectorStudio({files:e,setFiles:t,setGlobalProgress:n,explorerPreviewFil
 
     let total=e.length, results=[], targetDirOut="", errors=[];
     let collision=localStorage.getItem("rfine_collision_policy")||"auto_rename";
-    let hexColor = color === "brand" ? (a==="dark"?"#72BC28":"#4D9B22") : color === "white" ? "#FFFFFF" : color === "blue" ? "#3B82F6" : "#000000";
+    
+    let resolvedColor = "#000000";
+    let isMulti = colorMode === "original";
+    if (colorMode === "white") resolvedColor = "#FFFFFF";
+    else if (colorMode === "black") resolvedColor = "#000000";
+    else if (colorMode === "grey") {
+      let v = Math.round(255 * (greyPercent / 100));
+      let h = v.toString(16).padStart(2, '0');
+      resolvedColor = "#" + h + h + h;
+    } else if (colorMode === "custom") {
+      resolvedColor = customHex;
+    }
 
     for(let idx=0; idx<total; idx++){
       let item=e[idx];
@@ -213,9 +230,11 @@ function VectorStudio({files:e,setFiles:t,setGlobalProgress:n,explorerPreviewFil
           headers:{"Content-Type":"application/json"},
           body:JSON.stringify({
             files:[{name: item.name, path: item.path, size: item.size}],
+            mode: isMulti ? "multi" : "single",
+            steps: posterizeSteps,
             threshold,
             turdsize,
-            color: hexColor,
+            color: resolvedColor,
             invert,
             outputFolder: dest,
             collisionPolicy: collision
@@ -279,6 +298,47 @@ function VectorStudio({files:e,setFiles:t,setGlobalProgress:n,explorerPreviewFil
           ]}),
           secTracing&&(0,P.jsxs)("div",{className:"animate-fade-in",style:{padding:"2px 0",display:"flex",flexDirection:"column",gap:"12px"},children:[
             (0,P.jsxs)("div",{children:[
+              (0,P.jsx)("span",{className:"form-label",style:{fontSize:"10px",marginBottom:"6px",display:"block"},children:"Vector Color Theme"}),
+              (0,P.jsx)("div",{style:{display:"grid",gridTemplateColumns:"repeat(3, 1fr)",gap:"6px",marginBottom:"6px"},children:[
+                ["original","Original Colors"],
+                ["black","Black"],
+                ["white","White"]
+              ].map(([colKey,colLabel])=>(0,P.jsx)("button",{key:colKey,type:"button",onClick:()=>setColorMode(colKey),className:"clean-preset-btn " + (colorMode===colKey?"active":""),style:{padding:"7px 0",fontSize:"9.5px",fontWeight:"700",textAlign:"center"},children:colLabel}))}),
+              (0,P.jsx)("div",{style:{display:"grid",gridTemplateColumns:"repeat(2, 1fr)",gap:"6px"},children:[
+                ["grey","Shades of Grey"],
+                ["custom","Custom Color"]
+              ].map(([colKey,colLabel])=>(0,P.jsx)("button",{key:colKey,type:"button",onClick:()=>setColorMode(colKey),className:"clean-preset-btn " + (colorMode===colKey?"active":""),style:{padding:"7px 0",fontSize:"9.5px",fontWeight:"700",textAlign:"center"},children:colLabel}))})
+            ]}),
+            colorMode==="original"&&(0,P.jsxs)("div",{className:"animate-fade-in",style:{padding:"8px 10px",background:"rgba(77,155,34,0.06)",borderRadius:"6px",border:"1px solid rgba(77,155,34,0.18)"},children:[
+              (0,P.jsxs)("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"4px"},children:[
+                (0,P.jsx)("span",{style:{fontSize:"10px",fontWeight:"700",color:"var(--color-white)"},children:"Color Layers (Posterize Steps)"}),
+                (0,P.jsx)("span",{style:{fontSize:"11.5px",fontWeight:"800",color:"var(--primary-color)"},children:posterizeSteps + " Colors"})
+              ]}),
+              (0,P.jsx)("input",{type:"range",min:"2",max:"16",value:posterizeSteps,onChange:ev=>setPosterizeSteps(parseInt(ev.target.value)),style:{width:"100%",accentColor:"var(--primary-color)",cursor:"pointer"}}),
+              (0,P.jsxs)("div",{style:{display:"flex",justifyContent:"space-between",fontSize:"8.5px",color:"var(--color-slate)",marginTop:"2px"},children:[
+                (0,P.jsx)("span",{children:"2 (Poster Art)"}),
+                (0,P.jsx)("span",{children:"6 (Balanced)"}),
+                (0,P.jsx)("span",{children:"16 (Full Rich)"})
+              ]})
+            ]}),
+            colorMode==="grey"&&(0,P.jsxs)("div",{className:"animate-fade-in",style:{padding:"8px 10px",background:"rgba(0,0,0,0.1)",borderRadius:"6px",border:"1px solid var(--glass-border)"},children:[
+              (0,P.jsxs)("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"4px"},children:[
+                (0,P.jsx)("span",{style:{fontSize:"10px",fontWeight:"700",color:"var(--color-white)"},children:"Grey Darkness Level"}),
+                (0,P.jsx)("span",{style:{fontSize:"11.5px",fontWeight:"800",color:"var(--primary-color)"},children:greyPercent + "%"})
+              ]}),
+              (0,P.jsx)("input",{type:"range",min:"0",max:"100",value:greyPercent,onChange:ev=>setGreyPercent(parseInt(ev.target.value)),style:{width:"100%",accentColor:"var(--primary-color)",cursor:"pointer"}}),
+              (0,P.jsxs)("div",{style:{display:"flex",justifyContent:"space-between",fontSize:"8.5px",color:"var(--color-slate)",marginTop:"2px"},children:[
+                (0,P.jsx)("span",{children:"0% (Black)"}),
+                (0,P.jsx)("span",{children:"50% (Grey)"}),
+                (0,P.jsx)("span",{children:"100% (White)"})
+              ]})
+            ]}),
+            colorMode==="custom"&&(0,P.jsxs)("div",{className:"animate-fade-in",style:{display:"flex",alignItems:"center",gap:"8px",padding:"8px 10px",background:"rgba(0,0,0,0.1)",borderRadius:"6px",border:"1px solid var(--glass-border)"},children:[
+              (0,P.jsx)("input",{type:"color",value:customHex,onChange:ev=>setCustomHex(ev.target.value),style:{width:"28px",height:"28px",border:"none",borderRadius:"4px",cursor:"pointer",background:"transparent"}}),
+              (0,P.jsx)("input",{type:"text",className:"form-input",value:customHex,onChange:ev=>setCustomHex(ev.target.value),placeholder:"#Hex Code",style:{fontSize:"11px",padding:"4px 8px",height:"28px",fontWeight:"700"}}),
+              (0,P.jsx)("div",{style:{width:"20px",height:"20px",borderRadius:"4px",backgroundColor:customHex,border:"1px solid rgba(255,255,255,0.2)",flexShrink:0}})
+            ]}),
+            (0,P.jsxs)("div",{children:[
               (0,P.jsxs)("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"4px"},children:[
                 (0,P.jsx)("span",{className:"form-label",style:{fontSize:"10px",marginBottom:0},children:"Edge Threshold"}),
                 (0,P.jsx)("span",{style:{fontSize:"11.5px",fontWeight:"800",color:"var(--primary-color)"},children:threshold})
@@ -301,15 +361,6 @@ function VectorStudio({files:e,setFiles:t,setGlobalProgress:n,explorerPreviewFil
                 (0,P.jsx)("span",{children:"2px (Clean)"}),
                 (0,P.jsx)("span",{children:"20px (De-noise)"})
               ]})
-            ]}),
-            (0,P.jsxs)("div",{children:[
-              (0,P.jsx)("span",{className:"form-label",style:{fontSize:"10px",marginBottom:"6px",display:"block"},children:"Vector Color Theme"}),
-              (0,P.jsx)("div",{style:{display:"grid",gridTemplateColumns:"repeat(4, 1fr)",gap:"6px"},children:[
-                ["brand","Brand"],
-                ["#000000","Black"],
-                ["white","White"],
-                ["blue","Blue"]
-              ].map(([colKey,colLabel])=>(0,P.jsx)("button",{key:colKey,type:"button",onClick:()=>setColor(colKey),className:"clean-preset-btn " + (color===colKey?"active":""),style:{padding:"7px 0",fontSize:"10px",fontWeight:"700",textAlign:"center"},children:colLabel}))})
             ]}),
             (0,P.jsxs)("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",paddingTop:"4px"},children:[
               (0,P.jsx)("span",{className:"form-label",style:{fontSize:"10px",marginBottom:0},children:"Silhouette Invert"}),
@@ -347,7 +398,6 @@ function VectorStudio({files:e,setFiles:t,setGlobalProgress:n,explorerPreviewFil
     ]})
   ]});
 }
-
 
 (function initCollapsibleSidebarCategories() {
   function organizeNav() {
