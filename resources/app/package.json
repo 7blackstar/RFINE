@@ -1,6 +1,6 @@
 {
   "name": "rfine",
-  "version": "1.3.4",
+  "version": "1.3.5",
   "description": "RFINE Media Suite - Offline Desktop Tool",
   "author": "7blackstar",
   "main": "main.js",
@@ -43,10 +43,10 @@
       "createStartMenuShortcut": true,
       "shortcutName": "RFINE",
       "runAfterFinish": true,
-      "artifactName": "RFINE-Setup-1.3.4.exe"
+      "artifactName": "RFINE-Setup-1.3.5.exe"
     },
     "electronVersion": "30.0.0",
-    "artifactName": "RFINE-Setup-1.3.4.exe"
+    "artifactName": "RFINE-Setup-1.3.5.exe"
   },
   "devDependencies": {
     "electron": "^30.0.0"

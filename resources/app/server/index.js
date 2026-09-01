@@ -1148,7 +1148,7 @@ app.post('/api/gif/create', (req, res) => {
 
 app.post('/api/update/download-and-install', async (req, res) => {
   const { downloadUrl, version } = req.body;
-  const targetUrl = downloadUrl || `https://github.com/7blackstar/RFINE/releases/download/v${version || '1.3.4'}/RFINE_Setup.exe`;
+  const targetUrl = downloadUrl || `https://github.com/7blackstar/RFINE/releases/download/v${version || '1.3.5'}/RFINE_Setup.exe`;
 
   try {
     const tempDir = os.tmpdir();
