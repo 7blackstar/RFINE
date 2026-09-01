@@ -1063,9 +1063,9 @@ app.post('/api/audio/extract', async (req, res) => {
 });
 
 app.post('/api/gif/create', (req, res) => {
-  const { filePath, outputPath, startTime, duration, width, fps } = req.body;
-  if (!filePath || !outputPath || width === undefined || fps === undefined) {
-    return res.status(400).json({ error: 'Missing parameters' });
+  const { filePath, outputPath, fullLength = false, startTime, duration, width, fps, qualityProfile = 'balanced' } = req.body;
+  if (!filePath || !outputPath) {
+    return res.status(400).json({ error: 'Missing required parameters' });
   }
   
   if (!fs.existsSync(filePath)) {
@@ -1077,9 +1077,10 @@ app.post('/api/gif/create', (req, res) => {
     fs.mkdirSync(outDir, { recursive: true });
   }
 
+  const isFull = fullLength === true || fullLength === 'true';
   const ss = parseFloat(startTime) || 0;
   const t = parseFloat(duration) || 5;
-  const w = parseInt(width) || 480;
+  const w = width === 'original' || !width || width === '-1' ? -1 : (parseInt(width) || 480);
   const f = parseInt(fps) || 15;
 
   const tempInputPath = path.join(tempDir, `temp_gif_in_${Date.now()}${path.extname(filePath)}`);
@@ -1088,14 +1089,37 @@ app.post('/api/gif/create', (req, res) => {
   try {
     fs.copyFileSync(filePath, tempInputPath);
 
-    // Use the advanced FFmpeg palettegen/paletteuse filters for high-quality GIFs
-    const filterString = `[0:v] fps=${f},scale=${w}:-1:flags=lanczos,split [a][b];[a] palettegen [p];[b][p] paletteuse`;
+    // Dynamic scale filter
+    const scaleFilter = w === -1 ? 'scale=trunc(iw/2)*2:trunc(ih/2)*2:flags=lanczos' : `scale=${w}:-1:flags=lanczos`;
 
-    // Input seeking (-ss before -i) makes seeking near-instantaneous!
-    const cmd = ffmpeg()
-      .input(tempInputPath)
-      .inputOptions([`-ss ${ss}`])
-      .setDuration(t)
+    // Quality profiles for palettegen and paletteuse:
+    // 'high' = 256 colors, diff stats, sierra2_4a dithering (pristine gradients, zero banding)
+    // 'balanced' = 192 colors, diff stats, rectangle diff mode (crisp + 45% smaller file size)
+    // 'compact' = 128 colors, bayer dithering (ultra small file size for web / chat)
+    let maxColors = 256;
+    let ditherAlgorithm = 'sierra2_4a';
+    let diffMode = 'rectangle';
+
+    if (qualityProfile === 'compact') {
+      maxColors = 128;
+      ditherAlgorithm = 'bayer:bayer_scale=3';
+    } else if (qualityProfile === 'balanced') {
+      maxColors = 192;
+      ditherAlgorithm = 'sierra2_4a';
+    } else if (qualityProfile === 'high') {
+      maxColors = 256;
+      ditherAlgorithm = 'sierra2_4a';
+    }
+
+    const filterString = `[0:v] fps=${f},${scaleFilter},split [a][b];[a] palettegen=stats_mode=diff:max_colors=${maxColors}:reserve_transparent=0 [p];[b][p] paletteuse=dither=${ditherAlgorithm}:diff_mode=${diffMode}`;
+
+    const cmd = ffmpeg().input(tempInputPath);
+
+    if (!isFull) {
+      cmd.inputOptions([`-ss ${ss}`]).setDuration(t);
+    }
+
+    cmd
       .complexFilter(filterString)
       .on('end', () => {
         try {
@@ -1111,49 +1135,16 @@ app.post('/api/gif/create', (req, res) => {
         if (fs.existsSync(tempInputPath)) fs.unlinkSync(tempInputPath);
         if (fs.existsSync(tempOutputPath)) fs.unlinkSync(tempOutputPath);
         res.status(500).json({ error: err.message });
-      });
+      })
+      .save(tempOutputPath);
 
-    cmd.save(tempOutputPath);
   } catch (err) {
-    res.status(500).json({ error: 'GIF setup failed: ' + err.message });
-  }
-});
-
-
-// ==========================================
-// AUTO-UPDATER API (DOWNLOAD & SILENT INSTALL)
-// ==========================================
-app.get('/api/update/check', async (req, res) => {
-  try {
-    const ghRes = await fetch('https://api.github.com/repos/7blackstar/RFINE/releases/latest', {
-      headers: { 'User-Agent': 'RFINE-AutoUpdater' }
-    });
-    if (!ghRes.ok) {
-      return res.status(500).json({ error: 'Failed to contact release server' });
-    }
-    const release = await ghRes.json();
-    const tag = release.tag_name || '';
-    const latestVersion = tag.replace(/^v/, '').trim();
-    const currentVersion = '1.3.4';
-
-    // Standard direct installer URL as requested:
-    // https://github.com/7blackstar/RFINE/releases/download/{tag}/RFINE_Setup.exe
-    const downloadUrl = `https://github.com/7blackstar/RFINE/releases/download/${tag}/RFINE_Setup.exe`;
-
-    const updateAvailable = latestVersion !== '' && latestVersion !== currentVersion;
-
-    res.json({
-      success: true,
-      currentVersion,
-      latestVersion,
-      updateAvailable,
-      downloadUrl,
-      releaseNotes: release.body || ''
-    });
-  } catch (err) {
+    if (fs.existsSync(tempInputPath)) fs.unlinkSync(tempInputPath);
+    if (fs.existsSync(tempOutputPath)) fs.unlinkSync(tempOutputPath);
     res.status(500).json({ error: err.message });
   }
 });
+
 
 app.post('/api/update/download-and-install', async (req, res) => {
   const { downloadUrl, version } = req.body;
