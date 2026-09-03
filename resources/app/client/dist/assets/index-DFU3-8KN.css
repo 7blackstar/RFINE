@@ -345,3 +345,21 @@ body.dark-theme .nav-category-arrow {
   display: flex !important;
 }
 
+
+
+/* ======================================================== */
+/* CASE CONVERTER TOP PRESETS BAR INVISIBLE SCROLLBAR       */
+/* ======================================================== */
+
+.case-presets-scroll-bar {
+  -ms-overflow-style: none !important;  /* IE and Edge */
+  scrollbar-width: none !important;     /* Firefox */
+  padding-bottom: 12px !important;
+  box-sizing: border-box;
+}
+
+.case-presets-scroll-bar::-webkit-scrollbar {
+  display: none !important;             /* Chrome, Safari, Opera */
+  width: 0 !important;
+  height: 0 !important;
+}

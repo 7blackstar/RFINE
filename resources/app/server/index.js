@@ -1146,9 +1146,42 @@ app.post('/api/gif/create', (req, res) => {
 });
 
 
+
+// ==========================================
+// AUTO-UPDATER API (CHECK & SILENT INSTALL)
+// ==========================================
+app.get('/api/update/check', async (req, res) => {
+  try {
+    const ghRes = await fetch('https://api.github.com/repos/7blackstar/RFINE/releases/latest', {
+      headers: { 'User-Agent': 'RFINE-AutoUpdater' }
+    });
+    if (!ghRes.ok) {
+      return res.status(500).json({ error: 'Failed to contact release server' });
+    }
+    const release = await ghRes.json();
+    const tag = release.tag_name || '';
+    const latestVersion = tag.replace(/^v/, '').trim();
+    const currentVersion = '1.3.6';
+
+    const downloadUrl = `https://github.com/7blackstar/RFINE/releases/download/${tag}/RFINE_Setup.exe`;
+    const updateAvailable = latestVersion !== '' && latestVersion !== currentVersion;
+
+    res.json({
+      success: true,
+      currentVersion,
+      latestVersion,
+      updateAvailable,
+      downloadUrl,
+      releaseNotes: release.body || ''
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/update/download-and-install', async (req, res) => {
   const { downloadUrl, version } = req.body;
-  const targetUrl = downloadUrl || `https://github.com/7blackstar/RFINE/releases/download/v${version || '1.3.5'}/RFINE_Setup.exe`;
+  const targetUrl = downloadUrl || `https://github.com/7blackstar/RFINE/releases/download/v${version || '1.3.6'}/RFINE_Setup.exe`;
 
   try {
     const tempDir = os.tmpdir();
