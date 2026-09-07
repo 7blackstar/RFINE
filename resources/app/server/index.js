@@ -1089,16 +1089,14 @@ app.post('/api/gif/create', (req, res) => {
   try {
     fs.copyFileSync(filePath, tempInputPath);
 
-    // Dynamic scale filter
-    const scaleFilter = w === -1 ? 'scale=trunc(iw/2)*2:trunc(ih/2)*2:flags=lanczos' : `scale=${w}:-1:flags=lanczos`;
+    // Dynamic scale filter (preserves exact aspect & centering without subpixel offsets)
+    const scaleFilter = w === -1 ? 'scale=iw:ih:flags=lanczos' : `scale=${w}:trunc(ow/a/2)*2:flags=lanczos`;
 
     // Quality profiles for palettegen and paletteuse:
-    // 'high' = 256 colors, diff stats, sierra2_4a dithering (pristine gradients, zero banding)
-    // 'balanced' = 192 colors, diff stats, rectangle diff mode (crisp + 45% smaller file size)
-    // 'compact' = 128 colors, bayer dithering (ultra small file size for web / chat)
     let maxColors = 256;
     let ditherAlgorithm = 'sierra2_4a';
-    let diffMode = 'rectangle';
+    // Use diff_mode=none to eliminate FFmpeg's sub-frame bounding-box horizontal pixel shifts on delta frames
+    let diffMode = 'none';
 
     if (qualityProfile === 'compact') {
       maxColors = 128;
@@ -1111,7 +1109,7 @@ app.post('/api/gif/create', (req, res) => {
       ditherAlgorithm = 'sierra2_4a';
     }
 
-    const filterString = `[0:v] fps=${f},${scaleFilter},split [a][b];[a] palettegen=stats_mode=diff:max_colors=${maxColors}:reserve_transparent=0 [p];[b][p] paletteuse=dither=${ditherAlgorithm}:diff_mode=${diffMode}`;
+    const filterString = `[0:v] fps=${f},${scaleFilter},split [a][b];[a] palettegen=stats_mode=full:max_colors=${maxColors}:reserve_transparent=0 [p];[b][p] paletteuse=dither=${ditherAlgorithm}:diff_mode=${diffMode}`;
 
     const cmd = ffmpeg().input(tempInputPath);
 
@@ -1313,6 +1311,239 @@ app.post('/api/vector/convert-local', async (req, res) => {
 
   res.json({ results });
 });
+
+
+// ==========================================
+// CROP STUDIO API (IMAGES & VIDEOS)
+// ==========================================
+app.post('/api/crop/image', async (req, res) => {
+  const { files, crop, rotate = 0, flipH = false, flipV = false, perspective, format = 'original', quality = 90, outputFolder, collisionPolicy = 'auto_rename', fileSuffix = '_cropped' } = req.body;
+
+  if (!files || files.length === 0) {
+    return res.status(400).json({ error: 'No image files specified' });
+  }
+
+  const results = [];
+
+  for (const file of files) {
+    const inputPath = typeof file === 'string' ? file : file.path;
+    if (!inputPath || !fs.existsSync(inputPath)) {
+      results.push({ name: file.name || path.basename(inputPath || ''), success: false, error: 'File not found' });
+      continue;
+    }
+
+    const parsed = path.parse(inputPath);
+    let targetDir = outputFolder && outputFolder.trim() ? outputFolder.trim() : parsed.dir;
+    try {
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
+      }
+    } catch (e) {
+      targetDir = parsed.dir;
+    }
+
+    const ext = format === 'original' || !format ? parsed.ext : '.' + format.replace(/^./, '');
+    const baseName = `${parsed.name}${fileSuffix}${ext}`;
+    const initialTargetPath = path.join(targetDir, baseName);
+    const resolved = resolveCollisionPath(initialTargetPath, collisionPolicy);
+
+    if (resolved.skip) {
+      results.push({ name: file.name || parsed.base, success: true, skipped: true, outputPath: resolved.path, targetFolder: targetDir });
+      continue;
+    }
+
+    const finalTargetPath = resolved.path;
+
+    try {
+      let pipeline = sharp(inputPath);
+      const meta = await pipeline.metadata();
+
+      // 1. Perspective / Keystone Transform (via FFmpeg perspective or affine if specified)
+      if (perspective && perspective.corners && perspective.corners.length === 4) {
+        // [tl, tr, br, bl]
+        const c = perspective.corners;
+        const tempIn = path.join(tempDir, `temp_persp_in_${Date.now()}_${parsed.base}`);
+        const tempOut = path.join(tempDir, `temp_persp_out_${Date.now()}.png`);
+        fs.copyFileSync(inputPath, tempIn);
+
+        const x0 = Math.round(c[0].x * meta.width), y0 = Math.round(c[0].y * meta.height);
+        const x1 = Math.round(c[1].x * meta.width), y1 = Math.round(c[1].y * meta.height);
+        const x2 = Math.round(c[2].x * meta.width), y2 = Math.round(c[2].y * meta.height);
+        const x3 = Math.round(c[3].x * meta.width), y3 = Math.round(c[3].y * meta.height);
+
+        const outW = Math.round(Math.max(Math.hypot(x1 - x0, y1 - y0), Math.hypot(x2 - x3, y2 - y3)));
+        const outH = Math.round(Math.max(Math.hypot(x3 - x0, y3 - y0), Math.hypot(x2 - x1, y2 - y1)));
+
+        await new Promise((resolve, reject) => {
+          ffmpeg(tempIn)
+            .complexFilter(`perspective=x0=${x0}:y0=${y0}:x1=${x1}:y1=${y1}:x2=${x3}:y2=${y3}:x3=${x2}:y3=${y2}:w=${outW}:h=${outH}`)
+            .output(tempOut)
+            .on('end', () => resolve())
+            .on('error', (err) => reject(err))
+            .run();
+        });
+
+        if (fs.existsSync(tempIn)) fs.unlinkSync(tempIn);
+        pipeline = sharp(tempOut);
+      }
+
+      // 2. Rotation & Flip
+      if (rotate) {
+        pipeline = pipeline.rotate(parseInt(rotate) || 0);
+      }
+      if (flipH) {
+        pipeline = pipeline.flop();
+      }
+      if (flipV) {
+        pipeline = pipeline.flip();
+      }
+
+      // 3. Pixel Cropping
+      if (crop && crop.width > 0 && crop.height > 0) {
+        const left = Math.max(0, Math.round(crop.left || 0));
+        const top = Math.max(0, Math.round(crop.top || 0));
+        const width = Math.round(crop.width);
+        const height = Math.round(crop.height);
+
+        pipeline = pipeline.extract({ left, top, width, height });
+      }
+
+      // 4. Format Output
+      const cleanExt = ext.toLowerCase().replace('.', '');
+      if (cleanExt === 'jpg' || cleanExt === 'jpeg') {
+        pipeline = pipeline.jpeg({ quality: parseInt(quality) || 90, mozjpeg: true });
+      } else if (cleanExt === 'png') {
+        pipeline = pipeline.png({ compressionLevel: 8 });
+      } else if (cleanExt === 'webp') {
+        pipeline = pipeline.webp({ quality: parseInt(quality) || 90 });
+      } else if (cleanExt === 'avif') {
+        pipeline = pipeline.avif({ quality: parseInt(quality) || 85 });
+      }
+
+      await pipeline.toFile(finalTargetPath);
+      const outStat = fs.statSync(finalTargetPath);
+
+      results.push({
+        name: file.name || parsed.base,
+        success: true,
+        originalSize: file.size || (fs.existsSync(inputPath) ? fs.statSync(inputPath).size : outStat.size),
+        optimizedSize: outStat.size,
+        outputPath: finalTargetPath,
+        targetFolder: targetDir
+      });
+
+    } catch (err) {
+      console.error('Image crop processing error on file:', inputPath, err);
+      results.push({ name: file.name || parsed.base, success: false, error: err.message });
+    }
+  }
+
+  res.json({ results });
+});
+
+app.post('/api/crop/video', async (req, res) => {
+  const { files, crop, rotate = 0, flipH = false, flipV = false, outputFolder, collisionPolicy = 'auto_rename', fileSuffix = '_cropped' } = req.body;
+
+  if (!files || files.length === 0) {
+    return res.status(400).json({ error: 'No video files specified' });
+  }
+
+  const results = [];
+
+  for (const file of files) {
+    const inputPath = typeof file === 'string' ? file : file.path;
+    if (!inputPath || !fs.existsSync(inputPath)) {
+      results.push({ name: file.name || path.basename(inputPath || ''), success: false, error: 'File not found' });
+      continue;
+    }
+
+    const parsed = path.parse(inputPath);
+    let targetDir = outputFolder && outputFolder.trim() ? outputFolder.trim() : parsed.dir;
+    try {
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
+      }
+    } catch (e) {
+      targetDir = parsed.dir;
+    }
+
+    const ext = parsed.ext || '.mp4';
+    const baseName = `${parsed.name}${fileSuffix}${ext}`;
+    const initialTargetPath = path.join(targetDir, baseName);
+    const resolved = resolveCollisionPath(initialTargetPath, collisionPolicy);
+
+    if (resolved.skip) {
+      results.push({ name: file.name || parsed.base, success: true, skipped: true, outputPath: resolved.path, targetFolder: targetDir });
+      continue;
+    }
+
+    const finalTargetPath = resolved.path;
+
+    try {
+      // Build FFmpeg video filters
+      const videoFilters = [];
+
+      // 1. Crop filter: crop=w:h:x:y
+      if (crop && crop.width > 0 && crop.height > 0) {
+        // Ensure dimensions are even numbers for H.264 / H.265 compatibility
+        const w = Math.max(2, Math.floor(crop.width / 2) * 2);
+        const h = Math.max(2, Math.floor(crop.height / 2) * 2);
+        const x = Math.max(0, Math.floor((crop.left || 0) / 2) * 2);
+        const y = Math.max(0, Math.floor((crop.top || 0) / 2) * 2);
+
+        videoFilters.push(`crop=${w}:${h}:${x}:${y}`);
+      }
+
+      // 2. Rotate filter
+      if (rotate === 90 || rotate === '90') {
+        videoFilters.push('transpose=1');
+      } else if (rotate === 180 || rotate === '180') {
+        videoFilters.push('hflip,vflip');
+      } else if (rotate === 270 || rotate === '270') {
+        videoFilters.push('transpose=2');
+      }
+
+      // 3. Flip filters
+      if (flipH) videoFilters.push('hflip');
+      if (flipV) videoFilters.push('vflip');
+
+      const filterString = videoFilters.join(',');
+
+      await new Promise((resolve, reject) => {
+        let cmd = ffmpeg(inputPath);
+        if (filterString) {
+          cmd = cmd.videoFilters(filterString);
+        }
+        cmd
+          .videoCodec('libx264')
+          .outputOptions(['-preset fast', '-crf 22', '-c:a copy'])
+          .output(finalTargetPath)
+          .on('end', () => resolve())
+          .on('error', (err) => reject(err))
+          .run();
+      });
+
+      const outStat = fs.statSync(finalTargetPath);
+      const inStat = fs.statSync(inputPath);
+
+      results.push({
+        name: file.name || parsed.base,
+        success: true,
+        originalSize: inStat.size,
+        optimizedSize: outStat.size,
+        outputPath: finalTargetPath,
+        targetFolder: targetDir
+      });
+
+    } catch (err) {
+      console.error('Video crop error on file:', inputPath, err);
+      results.push({ name: file.name || parsed.base, success: false, error: err.message });
+    }
+  }
+
+  res.json({ results });
+});
+
 
 function startListening() {
   const srv = app.listen(port, () => {
