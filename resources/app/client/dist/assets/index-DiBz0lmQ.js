@@ -628,6 +628,7 @@ function CropStudio({files:e,setFiles:t,setGlobalProgress:n,explorerPreviewFile:
   let[flipH,setFlipH]=(0,v.useState)(!1);
   let[flipV,setFlipV]=(0,v.useState)(!1);
   let[isPerspective,setIsPerspective]=(0,v.useState)(!1);
+  let[isFocusedMode,setIsFocusedMode]=(0,v.useState)(!1);
   let[corners,setCorners]=(0,v.useState)([
     {x: 0.1, y: 0.1},
     {x: 0.9, y: 0.1},
@@ -736,30 +737,30 @@ function CropStudio({files:e,setFiles:t,setGlobalProgress:n,explorerPreviewFile:
     setCropNorm(prev=>({...prev, x: nx, y: ny}));
   };
 
-  let handlePointerDown=(e, mode, cornerIdx)=>{
-    e.preventDefault();
-    e.stopPropagation();
+  let handlePointerDown=(ev, mode, cornerIdx)=>{
+    ev.preventDefault();
+    ev.stopPropagation();
     dragModeRef.current = cornerIdx !== void 0 ? "corner-" + cornerIdx : mode;
     startPosRef.current = {
-      x: e.clientX,
-      y: e.clientY,
+      x: ev.clientX,
+      y: ev.clientY,
       crop: {...cropNorm},
       corners: [...corners]
     };
 
-    let onMove=ev=>{
+    let onMove=e=>{
       if(!imgRef.current || !dragModeRef.current) return;
       let bounds = imgRef.current.getBoundingClientRect();
       if(bounds.width <= 0 || bounds.height <= 0) return;
 
-      let dx = (ev.clientX - startPosRef.current.x) / bounds.width;
-      let dy = (ev.clientY - startPosRef.current.y) / bounds.height;
+      let dx = (e.clientX - startPosRef.current.x) / bounds.width;
+      let dy = (e.clientY - startPosRef.current.y) / bounds.height;
       let init = startPosRef.current.crop;
 
       if(dragModeRef.current.startsWith("corner-")){
         let cIdx = parseInt(dragModeRef.current.split("-")[1]);
-        let nx = Math.max(0, Math.min(1, (ev.clientX - bounds.left) / bounds.width));
-        let ny = Math.max(0, Math.min(1, (ev.clientY - bounds.top) / bounds.height));
+        let nx = Math.max(0, Math.min(1, (e.clientX - bounds.left) / bounds.width));
+        let ny = Math.max(0, Math.min(1, (e.clientY - bounds.top) / bounds.height));
         setCorners(prev=>{
           let next = [...prev];
           next[cIdx] = {x: nx, y: ny};
@@ -775,13 +776,13 @@ function CropStudio({files:e,setFiles:t,setGlobalProgress:n,explorerPreviewFile:
         if(rw && rh) normAspect = (rw / rh) / imgRatio;
       }
 
-      if(dragModeRef.current === "move"){
+      let m = dragModeRef.current;
+      if(m === "move"){
         let rawX = init.x + dx;
         let rawY = init.y + dy;
         let nx = Math.max(0, Math.min(1 - init.w, rawX));
         let ny = Math.max(0, Math.min(1 - init.h, rawY));
 
-        // Magnetic snap to center guideline (within 1.2% threshold)
         let targetCenterX = (1 - init.w) / 2;
         let targetCenterY = (1 - init.h) / 2;
         if(Math.abs(nx - targetCenterX) < 0.015) {
@@ -798,7 +799,7 @@ function CropStudio({files:e,setFiles:t,setGlobalProgress:n,explorerPreviewFile:
         }
 
         setCropNorm(prev=>({...prev, x: nx, y: ny}));
-      } else if(dragModeRef.current === "se"){
+      } else if(m === "se"){
         let maxW = 1 - init.x;
         let maxH = 1 - init.y;
         let nw = Math.max(0.02, Math.min(maxW, init.w + dx));
@@ -808,7 +809,7 @@ function CropStudio({files:e,setFiles:t,setGlobalProgress:n,explorerPreviewFile:
           nw = nh * normAspect;
         }
         setCropNorm(prev=>({...prev, w: Math.min(1 - init.x, nw), h: Math.min(1 - init.y, nh)}));
-      } else if(dragModeRef.current === "nw"){
+      } else if(m === "nw"){
         let maxW = init.x + init.w;
         let maxH = init.y + init.h;
         let nw = Math.max(0.02, Math.min(maxW, init.w - dx));
@@ -820,7 +821,7 @@ function CropStudio({files:e,setFiles:t,setGlobalProgress:n,explorerPreviewFile:
         let nx = Math.max(0, init.x + (init.w - nw));
         let ny = Math.max(0, init.y + (init.h - nh));
         setCropNorm({x: nx, y: ny, w: nw, h: nh});
-      } else if(dragModeRef.current === "ne"){
+      } else if(m === "ne"){
         let maxW = 1 - init.x;
         let maxH = init.y + init.h;
         let nw = Math.max(0.02, Math.min(maxW, init.w + dx));
@@ -831,7 +832,7 @@ function CropStudio({files:e,setFiles:t,setGlobalProgress:n,explorerPreviewFile:
         }
         let ny = Math.max(0, init.y + (init.h - nh));
         setCropNorm(prev=>({...prev, y: ny, w: nw, h: nh}));
-      } else if(dragModeRef.current === "sw"){
+      } else if(m === "sw"){
         let maxW = init.x + init.w;
         let maxH = 1 - init.y;
         let nw = Math.max(0.02, Math.min(maxW, init.w - dx));
@@ -842,6 +843,32 @@ function CropStudio({files:e,setFiles:t,setGlobalProgress:n,explorerPreviewFile:
         }
         let nx = Math.max(0, init.x + (init.w - nw));
         setCropNorm(prev=>({...prev, x: nx, w: nw, h: nh}));
+      } else if(m === "n"){
+        let maxH = init.y + init.h;
+        let nh = Math.max(0.02, Math.min(maxH, init.h - dy));
+        let nw = aspectRatio === "free" ? init.w : (nh * normAspect);
+        let ny = Math.max(0, init.y + (init.h - nh));
+        let nx = aspectRatio === "free" ? init.x : Math.max(0, Math.min(1 - nw, init.x + (init.w - nw)/2));
+        setCropNorm({x: nx, y: ny, w: nw, h: nh});
+      } else if(m === "s"){
+        let maxH = 1 - init.y;
+        let nh = Math.max(0.02, Math.min(maxH, init.h + dy));
+        let nw = aspectRatio === "free" ? init.w : (nh * normAspect);
+        let nx = aspectRatio === "free" ? init.x : Math.max(0, Math.min(1 - nw, init.x + (init.w - nw)/2));
+        setCropNorm(prev=>({...prev, x: nx, w: nw, h: nh}));
+      } else if(m === "w"){
+        let maxW = init.x + init.w;
+        let nw = Math.max(0.02, Math.min(maxW, init.w - dx));
+        let nh = aspectRatio === "free" ? init.h : (nw / normAspect);
+        let nx = Math.max(0, init.x + (init.w - nw));
+        let ny = aspectRatio === "free" ? init.y : Math.max(0, Math.min(1 - nh, init.y + (init.h - nh)/2));
+        setCropNorm({x: nx, y: ny, w: nw, h: nh});
+      } else if(m === "e"){
+        let maxW = 1 - init.x;
+        let nw = Math.max(0.02, Math.min(maxW, init.w + dx));
+        let nh = aspectRatio === "free" ? init.h : (nw / normAspect);
+        let ny = aspectRatio === "free" ? init.y : Math.max(0, Math.min(1 - nh, init.y + (init.h - nh)/2));
+        setCropNorm(prev=>({...prev, y: ny, w: nw, h: nh}));
       }
     };
 
@@ -935,7 +962,7 @@ function CropStudio({files:e,setFiles:t,setGlobalProgress:n,explorerPreviewFile:
       n({active:!1, percent:100, label:"Successfully cropped " + results.length + " files!", success:!0, targetFolder:targetDirOut});
       setSuccessData({results, targetFolder:targetDirOut});
       if(autoOpen&&targetDirOut){
-        try{await fetch(dA + "/open-folder",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({folderPath:targetDirOut})});}catch(e){}
+        try{await fetch(dA + "/open-folder",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({folderPath:targetDirOut})});}catch(err){}
       }
     } else {
       n({active:!1, percent:0, label:""});
@@ -944,7 +971,6 @@ function CropStudio({files:e,setFiles:t,setGlobalProgress:n,explorerPreviewFile:
     }
   };
 
-  // Sleek SVG icon render helper for aspect ratio presets
   let renderAspectIcon = (type) => {
     if (type === "free") {
       return (0,P.jsxs)("svg",{width:"18",height:"18",viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:"2",strokeLinecap:"round",strokeLinejoin:"round",children:[
@@ -993,123 +1019,395 @@ function CropStudio({files:e,setFiles:t,setGlobalProgress:n,explorerPreviewFile:
     h: mediaMeta.height ? Math.round(cropNorm.h * mediaMeta.height) : 0
   };
 
+  // Reusable Crop Canvas Component (used both inline and inside the Focused Fullscreen Modal)
+  let renderCropCanvas = (isFull = !1) => {
+    let target = (e.length > 0 && activeItem) ? activeItem : r;
+    if (!target) return null;
+
+    let mediaMaxH = isFull ? "calc(100vh - 140px)" : "calc(100vh - 360px)";
+
+    return (0,P.jsxs)("div",{
+      className:"glass-panel animate-fade-in",
+      style:{
+        flexGrow:1,
+        width: "100%",
+        height: isFull ? "100%" : "auto",
+        minHeight: isFull ? "auto" : "440px",
+        maxHeight: isFull ? "none" : "calc(100vh - 300px)",
+        display:"flex",
+        flexDirection:"column",
+        alignItems:"stretch",
+        justifyContent:"flex-start",
+        padding: isFull ? "16px 20px" : "14px 16px",
+        position:"relative",
+        boxSizing:"border-box",
+        marginBottom: isFull ? "0" : "16px",
+        background: isFull ? "transparent" : "rgba(0,0,0,0.25)",
+        border: isFull ? "none" : "1px solid var(--glass-border)"
+      },
+      children:[
+        // Top Toolbar Bar - Clean separate flex row above the image (never overlays image)
+        (0,P.jsxs)("div",{
+          style:{
+            width:"100%",
+            display:"flex",
+            alignItems:"center",
+            justifyContent:"space-between",
+            marginBottom:"14px",
+            flexShrink:0,
+            zIndex:5,
+            userSelect:"none"
+          },
+          children:[
+            // Left: Media Name Tag
+            (0,P.jsxs)("div",{
+              style:{
+                display:"inline-flex",
+                alignItems:"center",
+                gap:"8px",
+                background:"rgba(0,0,0,0.55)",
+                backdropFilter:"blur(8px)",
+                padding:"6px 14px",
+                borderRadius:"8px",
+                border:"1px solid var(--glass-border)",
+                maxWidth: isFull ? "65%" : "55%"
+              },
+              title: target.name || "Media File",
+              children:[
+                (0,P.jsx)(pe,{size:14,color:"var(--primary-color)",style:{flexShrink:0}}),
+                (0,P.jsx)("span",{
+                  style:{
+                    fontSize:"12px",
+                    fontWeight:"800",
+                    color:"var(--color-white)",
+                    overflow:"hidden",
+                    textOverflow:"ellipsis",
+                    whiteSpace:"nowrap"
+                  },
+                  children: target.name || "Media Canvas"
+                })
+              ]
+            }),
+
+            // Right: Resolution text (pure text, no border/outline/fill) & Primary Action Button (Enlarge / Done matching 'Add Selected' style)
+            (0,P.jsxs)("div",{style:{display:"flex",alignItems:"center",gap:"12px"},children:[
+              mediaMeta.width > 0 && (0,P.jsxs)("span",{
+                style:{
+                  fontSize:"11px",
+                  color:"var(--primary-color)",
+                  fontWeight:"700",
+                  letterSpacing:"0.3px",
+                  padding:"0 4px"
+                },
+                children:[mediaMeta.width," × ",mediaMeta.height," px"]
+              }),
+              // Unified action button matching 'Add Selected' style: padding 6px 12px, fontSize 11px, borderRadius 6px
+              !isFull ? (
+                (0,P.jsxs)("button",{
+                  onClick:()=>setIsFocusedMode(!0),
+                  className:"btn-primary",
+                  style:{
+                    padding:"6px 12px",
+                    fontSize:"11px",
+                    borderRadius:"6px",
+                    display:"flex",
+                    alignItems:"center",
+                    gap:"5px",
+                    cursor:"pointer"
+                  },
+                  title:"Enlarge Crop Canvas",
+                  children:[
+                    (0,P.jsxs)("svg",{width:"12",height:"12",viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:"2.5",strokeLinecap:"round",strokeLinejoin:"round",children:[
+                      (0,P.jsx)("path",{d:"M15 3h6v6"}),
+                      (0,P.jsx)("path",{d:"M9 21H3v-6"}),
+                      (0,P.jsx)("path",{d:"M21 3l-7 7"}),
+                      (0,P.jsx)("path",{d:"M3 21l7-7"})
+                    ]}),
+                    "Enlarge"
+                  ]
+                })
+              ) : (
+                (0,P.jsx)("button",{
+                  onClick:()=>setIsFocusedMode(!1),
+                  className:"btn-primary",
+                  style:{
+                    padding:"6px 12px",
+                    fontSize:"11px",
+                    borderRadius:"6px",
+                    display:"flex",
+                    alignItems:"center",
+                    gap:"4px",
+                    cursor:"pointer"
+                  },
+                  title:"Done Cropping (Esc)",
+                  children:"✓ Done"
+                })
+              )
+            ]})
+          ]
+        }),
+        
+        // Media Viewport Container
+        (0,P.jsx)("div",{
+          style:{
+            flexGrow:1,
+            width:"100%",
+            display:"flex",
+            alignItems:"center",
+            justifyContent:"center",
+            position:"relative",
+            overflow:"hidden"
+          },
+          children: (0,P.jsxs)("div",{
+            ref:containerRef,
+            style:{
+              position:"relative",
+              maxWidth:"100%",
+              maxHeight:"100%",
+              display:"inline-flex",
+              alignItems:"center",
+              justifyContent:"center",
+              userSelect:"none",
+              borderRadius:"8px"
+            },
+            children:[
+              mediaMeta.isVideo ? (
+                (0,P.jsx)("video",{
+                  ref: imgRef,
+                  src: dA + "/image-preview?path=" + encodeURIComponent(target.path||target),
+                  controls: !0,
+                  onLoadedMetadata: ev=>handleMediaLoaded(ev.target.videoWidth, ev.target.videoHeight, !0),
+                  style:{maxWidth:"100%",maxHeight: mediaMaxH,width:"auto",height:"auto",display:"block",objectFit:"contain",transform:"rotate(" + rotate + "deg) scale(" + (flipH?-1:1) + ", " + (flipV?-1:1) + ")",boxShadow:"0 12px 40px rgba(0,0,0,0.5)"}
+                })
+              ) : (
+                (0,P.jsx)("img",{
+                  ref: imgRef,
+                  src: dA + "/image-preview?path=" + encodeURIComponent(target.path||target),
+                  onLoad: ev=>handleMediaLoaded(ev.target.naturalWidth, ev.target.naturalHeight, !1),
+                  style:{maxWidth:"100%",maxHeight: mediaMaxH,width:"auto",height:"auto",display:"block",objectFit:"contain",transform:"rotate(" + rotate + "deg) scale(" + (flipH?-1:1) + ", " + (flipV?-1:1) + ")",boxShadow:"0 12px 40px rgba(0,0,0,0.5)"}
+                })
+              ),
+
+              // Image Center Axis Smart Guidelines
+              !isPerspective && (0,P.jsxs)(P.Fragment,{children:[
+                (0,P.jsx)("div",{style:{position:"absolute",left:"50%",top:0,bottom:0,width:"1px",background:isCenterX ? "#38bdf8" : "rgba(255,255,255,0.22)",boxShadow:isCenterX ? "0 0 10px #38bdf8" : "none",pointerEvents:"none",zIndex:15,transition:"background 0.15s, box-shadow 0.15s"}}),
+                (0,P.jsx)("div",{style:{position:"absolute",top:"50%",left:0,right:0,height:"1px",background:isCenterY ? "#38bdf8" : "rgba(255,255,255,0.22)",boxShadow:isCenterY ? "0 0 10px #38bdf8" : "none",pointerEvents:"none",zIndex:15,transition:"background 0.15s, box-shadow 0.15s"}}),
+                (0,P.jsx)("div",{style:{position:"absolute",left:"calc(50% - 5px)",top:"calc(50% - 5px)",width:"10px",height:"10px",borderRadius:"50%",border:"2px solid " + ((isCenterX&&isCenterY) ? "#38bdf8" : "rgba(255,255,255,0.45)"),pointerEvents:"none",zIndex:16}})
+              ]}),
+
+              // Standard Interactive Crop Box with 8 Handles
+              !isPerspective && (0,P.jsxs)("div",{
+                onMouseDown: ev=>handlePointerDown(ev, "move"),
+                style: {
+                  position: "absolute",
+                  left: (cropNorm.x * 100) + "%",
+                  top: (cropNorm.y * 100) + "%",
+                  width: (cropNorm.w * 100) + "%",
+                  height: (cropNorm.h * 100) + "%",
+                  border: (isCenterX && isCenterY) ? "2px solid #38bdf8" : "2px solid var(--primary-color)",
+                  boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.38)",
+                  cursor: "move",
+                  boxSizing: "border-box",
+                  zIndex: 20
+                },
+                children: [
+                  // Rule-of-thirds grid lines
+                  (0,P.jsx)("div",{style:{position:"absolute",left:"33.33%",top:0,bottom:0,width:"1px",background:"rgba(255,255,255,0.35)",pointerEvents:"none"}}),
+                  (0,P.jsx)("div",{style:{position:"absolute",left:"66.66%",top:0,bottom:0,width:"1px",background:"rgba(255,255,255,0.35)",pointerEvents:"none"}}),
+                  (0,P.jsx)("div",{style:{position:"absolute",top:"33.33%",left:0,right:0,height:"1px",background:"rgba(255,255,255,0.35)",pointerEvents:"none"}}),
+                  (0,P.jsx)("div",{style:{position:"absolute",top:"66.66%",left:0,right:0,height:"1px",background:"rgba(255,255,255,0.35)",pointerEvents:"none"}}),
+
+                  // Crop box internal center crosshair lines
+                  (0,P.jsx)("div",{style:{position:"absolute",left:"50%",top:0,bottom:0,width:"1px",borderLeft:"1px dashed rgba(255,255,255,0.45)",pointerEvents:"none"}}),
+                  (0,P.jsx)("div",{style:{position:"absolute",top:"50%",left:0,right:0,height:"1px",borderTop:"1px dashed rgba(255,255,255,0.45)",pointerEvents:"none"}}),
+                  
+                  // 4 Corner Handles (NW, NE, SE, SW)
+                  (0,P.jsx)("div",{onMouseDown:ev=>handlePointerDown(ev, "nw"),style:{position:"absolute",top:"-7px",left:"-7px",width:"14px",height:"14px",background:(isCenterX && isCenterY) ? "#38bdf8" : "var(--primary-color)",border:"2px solid #FFFFFF",borderRadius:"3px",cursor:"nwse-resize",zIndex:30}}),
+                  (0,P.jsx)("div",{onMouseDown:ev=>handlePointerDown(ev, "ne"),style:{position:"absolute",top:"-7px",right:"-7px",width:"14px",height:"14px",background:(isCenterX && isCenterY) ? "#38bdf8" : "var(--primary-color)",border:"2px solid #FFFFFF",borderRadius:"3px",cursor:"nesw-resize",zIndex:30}}),
+                  (0,P.jsx)("div",{onMouseDown:ev=>handlePointerDown(ev, "se"),style:{position:"absolute",bottom:"-7px",right:"-7px",width:"14px",height:"14px",background:(isCenterX && isCenterY) ? "#38bdf8" : "var(--primary-color)",border:"2px solid #FFFFFF",borderRadius:"3px",cursor:"nwse-resize",zIndex:30}}),
+                  (0,P.jsx)("div",{onMouseDown:ev=>handlePointerDown(ev, "sw"),style:{position:"absolute",bottom:"-7px",left:"-7px",width:"14px",height:"14px",background:(isCenterX && isCenterY) ? "#38bdf8" : "var(--primary-color)",border:"2px solid #FFFFFF",borderRadius:"3px",cursor:"nesw-resize",zIndex:30}}),
+
+                  // 4 Edge Handles (N, S, E, W)
+                  (0,P.jsx)("div",{onMouseDown:ev=>handlePointerDown(ev, "n"),style:{position:"absolute",top:"-6px",left:"calc(50% - 10px)",width:"20px",height:"10px",background:(isCenterX && isCenterY) ? "#38bdf8" : "var(--primary-color)",border:"2px solid #FFFFFF",borderRadius:"3px",cursor:"ns-resize",zIndex:30}}),
+                  (0,P.jsx)("div",{onMouseDown:ev=>handlePointerDown(ev, "s"),style:{position:"absolute",bottom:"-6px",left:"calc(50% - 10px)",width:"20px",height:"10px",background:(isCenterX && isCenterY) ? "#38bdf8" : "var(--primary-color)",border:"2px solid #FFFFFF",borderRadius:"3px",cursor:"ns-resize",zIndex:30}}),
+                  (0,P.jsx)("div",{onMouseDown:ev=>handlePointerDown(ev, "w"),style:{position:"absolute",top:"calc(50% - 10px)",left:"-6px",width:"10px",height:"20px",background:(isCenterX && isCenterY) ? "#38bdf8" : "var(--primary-color)",border:"2px solid #FFFFFF",borderRadius:"3px",cursor:"ew-resize",zIndex:30}}),
+                  (0,P.jsx)("div",{onMouseDown:ev=>handlePointerDown(ev, "e"),style:{position:"absolute",top:"calc(50% - 10px)",right:"-6px",width:"10px",height:"20px",background:(isCenterX && isCenterY) ? "#38bdf8" : "var(--primary-color)",border:"2px solid #FFFFFF",borderRadius:"3px",cursor:"ew-resize",zIndex:30}}),
+
+                  // Dimension badge inside crop box
+                  (0,P.jsxs)("div",{style:{position:"absolute",bottom:"8px",left:"8px",fontSize:"10.5px",fontWeight:"800",color:"#FFFFFF",background:"rgba(0,0,0,0.8)",backdropFilter:"blur(6px)",padding:"4px 8px",borderRadius:"5px",pointerEvents:"none",border:"1px solid rgba(255,255,255,0.2)",display:"flex",alignItems:"center",gap:"5px"},children:[
+                    calcCropPixels.w > 0 ? (calcCropPixels.w + " × " + calcCropPixels.h + " px") : (Math.round(cropNorm.w*100) + "% × " + Math.round(cropNorm.h*100) + "%"),
+                    aspectRatio !== "free" && (0,P.jsx)("span",{style:{color:"var(--primary-color)",marginLeft:"2px"},children:"(" + aspectRatio + ")"})
+                  ]})
+                ]
+              }),
+
+              // Perspective Keystone 4-Corner Handles
+              isPerspective && (0,P.jsxs)(P.Fragment,{children:[
+                (0,P.jsxs)("svg",{style:{position:"absolute",top:0,left:0,width:"100%",height:"100%",pointerEvents:"none"},children:[
+                  (0,P.jsx)("polygon",{
+                    points: corners.map(c=>(c.x*100)+"%,"+(c.y*100)+"%").join(" "),
+                    fill: "rgba(77, 155, 34, 0.2)",
+                    stroke: "var(--primary-color)",
+                    strokeWidth: "2"
+                  })
+                ]}),
+                corners.map((c, idx)=>(0,P.jsx)("div",{
+                  key: idx,
+                  onMouseDown: ev=>handlePointerDown(ev, "corner", idx),
+                  style: {
+                    position: "absolute",
+                    left: "calc(" + (c.x*100) + "% - 8px)",
+                    top: "calc(" + (c.y*100) + "% - 8px)",
+                    width: "16px",
+                    height: "16px",
+                    borderRadius: "50%",
+                    background: "var(--primary-color)",
+                    border: "2px solid #FFFFFF",
+                    boxShadow: "0 0 10px rgba(0,0,0,0.5)",
+                    cursor: "crosshair",
+                    zIndex: 30
+                  },
+                  title: "Drag corner pin " + (idx+1)
+                }))
+              ]})
+            ]
+          })
+        })
+      ]
+    });
+  };
+
+  // Reusable Crop Settings Panel Controls
+  let renderCropSettings = () => {
+    return (0,P.jsxs)(P.Fragment,{children:[
+      (0,P.jsxs)("div",{style:{marginBottom:"18px"},children:[
+        (0,P.jsxs)("div",{onClick:()=>setSecCrop(!secCrop),style:{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",padding:"6px 0",borderBottom:"1px solid var(--glass-border)",marginBottom:"10px"},children:[
+          (0,P.jsxs)("div",{style:{display:"flex",alignItems:"center",gap:"8px"},children:[
+            (0,P.jsx)(pe,{size:13,color:"var(--primary-color)"}),
+            (0,P.jsx)("span",{style:{fontSize:"11px",fontWeight:"bold",color:"var(--color-white)",textTransform:"uppercase",letterSpacing:"0.5px"},children:"Aspect Ratio & Presets"})
+          ]}),
+          (0,P.jsx)("span",{style:{fontSize:"10px",color:"var(--color-slate)"},children:secCrop?"▼":"▶"})
+        ]}),
+        secCrop&&(0,P.jsxs)("div",{className:"animate-fade-in",style:{padding:"2px 0",display:"flex",flexDirection:"column",gap:"12px"},children:[
+          (0,P.jsxs)("div",{children:[
+            (0,P.jsx)("span",{className:"form-label",style:{fontSize:"10px",marginBottom:"6px",display:"block"},children:"Crop Mode"}),
+            (0,P.jsxs)("div",{className:"clean-preset-grid",style:{gridTemplateColumns:"1fr 1fr",marginBottom:"8px"},children:[
+              (0,P.jsx)("button",{type:"button",className:"clean-preset-btn " + (!isPerspective?"active":""),onClick:()=>setIsPerspective(!1),style:{padding:"7px 0",fontSize:"10px",fontWeight:"700"},children:"Standard Crop"}),
+              (0,P.jsx)("button",{type:"button",className:"clean-preset-btn " + (isPerspective?"active":""),onClick:()=>setIsPerspective(!0),style:{padding:"7px 0",fontSize:"10px",fontWeight:"700"},children:"Perspective Keystone"})
+            ]})
+          ]}),
+          !isPerspective&&(0,P.jsxs)("div",{children:[
+            (0,P.jsxs)("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"6px"},children:[
+              (0,P.jsx)("span",{className:"form-label",style:{fontSize:"10px",margin:0},children:"Aspect Ratio"}),
+              (0,P.jsxs)("div",{style:{display:"flex",gap:"4px"},children:[
+                [{id:"all",label:"All"},{id:"landscape",label:"Landscape"},{id:"portrait",label:"Portrait"},{id:"standard",label:"Square"}].map(cat=>(
+                  (0,P.jsx)("button",{
+                    key: cat.id,
+                    type: "button",
+                    onClick:()=>setPresetCategory(cat.id),
+                    style: {
+                      background: presetCategory===cat.id ? "var(--primary-color)" : "transparent",
+                      color: presetCategory===cat.id ? "#FFFFFF" : "var(--color-slate)",
+                      border: "none",
+                      borderRadius: "4px",
+                      padding: "2px 6px",
+                      fontSize: "9px",
+                      fontWeight: "700",
+                      cursor: "pointer",
+                      transition: "all 0.15s"
+                    },
+                    children: cat.label
+                  })
+                ))
+              ]})
+            ]}),
+            (0,P.jsx)("div",{style:{display:"grid",gridTemplateColumns:"repeat(3, 1fr)",gap:"6px"},children:
+              filteredPresets.map(p=>{
+                let isActive = aspectRatio === p.id;
+                return (0,P.jsxs)("button",{
+                  key: p.id,
+                  type: "button",
+                  onClick:()=>applyPresetRatio(p.id),
+                  className: "clean-preset-btn " + (isActive ? "active" : ""),
+                  style: {
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: "10px 4px",
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                    gap: "5px",
+                    minHeight: "56px",
+                    border: isActive ? "1px solid var(--primary-color)" : "1px solid var(--glass-border)",
+                    background: isActive ? "rgba(77, 155, 34, 0.14)" : "rgba(255, 255, 255, 0.02)"
+                  },
+                  title: p.sub,
+                  children: [
+                    (0,P.jsx)("div",{style:{color: isActive ? "var(--primary-color)" : "var(--color-white)",display:"flex",alignItems:"center",justifyContent:"center"},children: renderAspectIcon(p.iconType)}),
+                    (0,P.jsx)("span",{style:{fontSize:"11px",fontWeight:"800",color: isActive ? "var(--primary-color)" : "var(--color-white)",letterSpacing:"0.3px"},children: p.label}),
+                    (0,P.jsx)("span",{style:{fontSize:"8px",color: isActive ? "var(--primary-color)" : "var(--color-slate)",fontWeight:"600",textTransform:"none"},children: p.sub})
+                  ]
+                });
+              })
+            })
+          ]}),
+          !isPerspective&&(0,P.jsx)("button",{
+            type:"button",
+            onClick:centerCropBox,
+            className:"btn-secondary",
+            style:{padding:"6px 0",fontSize:"10px",justifyContent:"center",fontWeight:"700",width:"100%",color:(isCenterX && isCenterY) ? "#38bdf8" : "inherit",border:(isCenterX && isCenterY) ? "1px solid rgba(56, 189, 248, 0.4)" : "1px solid var(--glass-border)"},
+            children:"⌖ Align To Center"
+          }),
+          (0,P.jsxs)("div",{children:[
+            (0,P.jsx)("span",{className:"form-label",style:{fontSize:"10px",marginBottom:"6px",display:"block"},children:"Rotate & Flip"}),
+            (0,P.jsxs)("div",{style:{display:"grid",gridTemplateColumns:"repeat(4, 1fr)",gap:"6px"},children:[
+              (0,P.jsx)("button",{type:"button",className:"btn-secondary",onClick:()=>setRotate(r=>(r-90+360)%360),style:{padding:"6px 0",fontSize:"10px",justifyContent:"center",fontWeight:"700"},title:"Rotate Left 90°",children:"↺ -90°"}),
+              (0,P.jsx)("button",{type:"button",className:"btn-secondary",onClick:()=>setRotate(r=>(r+90)%360),style:{padding:"6px 0",fontSize:"10px",justifyContent:"center",fontWeight:"700"},title:"Rotate Right 90°",children:"↻ +90°"}),
+              (0,P.jsx)("button",{type:"button",className:"clean-preset-btn " + (flipH?"active":""),onClick:()=>setFlipH(!flipH),style:{padding:"6px 0",fontSize:"10px",justifyContent:"center",fontWeight:"700"},title:"Flip Horizontal",children:"⇄ Flip H"}),
+              (0,P.jsx)("button",{type:"button",className:"clean-preset-btn " + (flipV?"active":""),onClick:()=>setFlipV(!flipV),style:{padding:"6px 0",fontSize:"10px",justifyContent:"center",fontWeight:"700"},title:"Flip Vertical",children:"⇅ Flip V"})
+            ]})
+          ]})
+        ]})
+      ]}),
+
+      (0,P.jsxs)("div",{style:{marginBottom:"20px"},children:[
+        (0,P.jsxs)("div",{onClick:()=>setSecDest(!secDest),style:{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",padding:"6px 0",borderBottom:"1px solid var(--glass-border)",marginBottom:"10px"},children:[
+          (0,P.jsxs)("div",{style:{display:"flex",alignItems:"center",gap:"8px"},children:[
+            (0,P.jsx)(ue,{size:13,color:"var(--primary-color)"}),
+            (0,P.jsx)("span",{style:{fontSize:"11px",fontWeight:"bold",color:"var(--color-white)",textTransform:"uppercase",letterSpacing:"0.5px"},children:"Save Destination"})
+          ]}),
+          (0,P.jsx)("span",{style:{fontSize:"10px",color:"var(--color-slate)"},children:secDest?"▼":"▶"})
+        ]}),
+        secDest&&(0,P.jsxs)("div",{className:"animate-fade-in",style:{padding:"2px 0"},children:[
+          (0,P.jsx)("span",{className:"form-label",style:{fontSize:"10px"},children:"Target Directory"}),
+          (0,P.jsxs)("div",{className:"clean-preset-grid",style:{gridTemplateColumns:"1fr 1fr 1.2fr"},children:[
+            (0,P.jsx)("button",{type:"button",className:"clean-preset-btn " + (saveDest==="original"?"active":""),onClick:()=>setSaveDest("original"),style:{padding:"6px 4px",fontSize:"9.5px"},children:"Original"}),
+            (0,P.jsx)("button",{type:"button",className:"clean-preset-btn " + (saveDest==="default"?"active":""),onClick:()=>setSaveDest("default"),style:{padding:"6px 4px",fontSize:"9.5px"},children:"Default"}),
+            (0,P.jsx)("button",{type:"button",className:"clean-preset-btn " + (saveDest==="custom"?"active":""),onClick:()=>o(customDest,path=>{setCustomDest(path);setSaveDest("custom");}),style:{padding:"6px 4px",fontSize:"9.5px"},children:"Custom..."})
+          ]}),
+          (0,P.jsxs)("span",{style:{fontSize:"9px",color:"var(--color-slate)",fontStyle:"italic",display:"block",marginTop:"4px",textOverflow:"ellipsis",overflow:"hidden",whiteSpace:"nowrap"},title:saveDest==="original"?"Original file directory":saveDest==="default"?localStorage.getItem("rfine_def_save_dir")||"Default folder not set":customDest||"No folder selected",children:["Saving to: ",saveDest==="original"?"Original Folder":saveDest==="default"?localStorage.getItem("rfine_def_save_dir")||"Default not set":customDest?fA.basename(customDest):"Not configured"]}),
+          (0,P.jsxs)("div",{style:{display:"flex",alignItems:"center",gap:"8px",marginTop:"12px"},children:[
+            (0,P.jsx)("input",{type:"checkbox",id:"chk-crop-open-folder",checked:autoOpen,onChange:e=>setAutoOpen(e.target.checked)}),
+            (0,P.jsx)("label",{htmlFor:"chk-crop-open-folder",style:{fontSize:"11px",color:"var(--color-white)",cursor:"pointer"},children:"Auto-Open Output Directory"})
+          ]})
+        ]})
+      ]})
+    ]});
+  };
+
   return (0,P.jsxs)("div",{className:"workspace-layout",children:[
+    // Standard middle canvas
     (0,P.jsxs)("div",{className:"middle-canvas",children:[
       (0,P.jsx)("div",{style:isExpCol?{height:"48px",minHeight:"48px",maxHeight:"48px",flexShrink:0,marginBottom:"16px",transition:"all 0.35s cubic-bezier(0.25, 1, 0.5, 1)"}:{height:c + "px",display:"flex",flexDirection:"column",minHeight:"150px",maxHeight:"600px",flexShrink:0,marginBottom:"0px",transition:"all 0.35s cubic-bezier(0.25, 1, 0.5, 1)"},children:(0,P.jsx)(yA,{onAddFiles:handleAddFiles,allowedExtensions:[".png",".jpg",".jpeg",".webp",".bmp",".tiff",".mp4",".mov",".webm",".mkv"],onPreviewFile:i,theme:a,defaultPath:localStorage.getItem("rfine_def_save_dir")||void 0,storageKey:"rfine_last_dir_crop",openFolderPicker:o,onCollapseChange:setIsExpCol})}),
       !isExpCol&&(0,P.jsx)("div",{onMouseDown:handleResizeDrag,style:{height:"8px",cursor:"ns-resize",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 0 16px 0",userSelect:"none",position:"relative",zIndex:10,flexShrink:0},title:"Drag to resize panels",children:(0,P.jsx)("div",{style:{width:"40px",height:"4px",borderRadius:"2px",backgroundColor:"rgba(0,0,0,0.1)"}})}),
       
-      (e.length > 0 && activeItem) ? (0,P.jsxs)("div",{className:"glass-panel animate-fade-in",style:{flexGrow:1,minHeight:"440px",maxHeight:"calc(100vh - 300px)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"16px",position:"relative",overflow:"hidden",boxSizing:"border-box",marginBottom:"16px",background:"rgba(0,0,0,0.25)"},children:[
-        (0,P.jsxs)("div",{style:{position:"absolute",top:"12px",left:"16px",zIndex:20,display:"flex",alignItems:"center",gap:"8px"},children:[
-          (0,P.jsx)("span",{style:{fontSize:"11px",fontWeight:"800",color:"var(--color-white)",background:"rgba(0,0,0,0.6)",backdropFilter:"blur(8px)",padding:"4px 10px",borderRadius:"6px",border:"1px solid var(--glass-border)"},children:activeItem.name||"Media Canvas"}),
-          mediaMeta.width > 0 && (0,P.jsxs)("span",{style:{fontSize:"10px",color:"var(--primary-color)",background:"rgba(77,155,34,0.18)",padding:"3px 8px",borderRadius:"6px",fontWeight:"700",border:"1px solid rgba(77,155,34,0.3)"},children:[mediaMeta.width," × ",mediaMeta.height," px"]}),
-          // Exact center indicator tag
-          !isPerspective && (isCenterX || isCenterY) && (0,P.jsxs)("span",{style:{fontSize:"10px",color:"#38bdf8",background:"rgba(56, 189, 248, 0.18)",padding:"3px 8px",borderRadius:"6px",fontWeight:"700",border:"1px solid rgba(56, 189, 248, 0.4)",display:"flex",alignItems:"center",gap:"4px"},children:[
-            "⌖ ", (isCenterX && isCenterY) ? "Exact Center" : isCenterX ? "Horizontal Center" : "Vertical Center"
-          ]})
-        ]}),
-        
-        (0,P.jsxs)("div",{ref:containerRef,style:{position:"relative",maxWidth:"100%",maxHeight:"100%",display:"inline-flex",alignItems:"center",justifyContent:"center",userSelect:"none",borderRadius:"8px"},children:[
-          mediaMeta.isVideo ? (
-            (0,P.jsx)("video",{
-              ref: imgRef,
-              src: dA + "/image-preview?path=" + encodeURIComponent(activeItem.path||activeItem),
-              controls: !0,
-              onLoadedMetadata: ev=>handleMediaLoaded(ev.target.videoWidth, ev.target.videoHeight, !0),
-              style:{maxWidth:"100%",maxHeight:"calc(100vh - 340px)",width:"auto",height:"auto",display:"block",objectFit:"contain",transform:"rotate(" + rotate + "deg) scale(" + (flipH?-1:1) + ", " + (flipV?-1:1) + ")",boxShadow:"0 8px 30px rgba(0,0,0,0.4)"}
-            })
-          ) : (
-            (0,P.jsx)("img",{
-              ref: imgRef,
-              src: dA + "/image-preview?path=" + encodeURIComponent(activeItem.path||activeItem),
-              onLoad: ev=>handleMediaLoaded(ev.target.naturalWidth, ev.target.naturalHeight, !1),
-              style:{maxWidth:"100%",maxHeight:"calc(100vh - 340px)",width:"auto",height:"auto",display:"block",objectFit:"contain",transform:"rotate(" + rotate + "deg) scale(" + (flipH?-1:1) + ", " + (flipV?-1:1) + ")",boxShadow:"0 8px 30px rgba(0,0,0,0.4)"}
-            })
-          ),
-
-          // Image Center Axis Smart Guidelines (Illuminates cyan when crop box matches or is being dragged near center)
-          !isPerspective && (0,P.jsxs)(P.Fragment,{children:[
-            (0,P.jsx)("div",{style:{position:"absolute",left:"50%",top:0,bottom:0,width:"1px",background:isCenterX ? "#38bdf8" : "rgba(255,255,255,0.18)",boxShadow:isCenterX ? "0 0 8px #38bdf8" : "none",pointerEvents:"none",zIndex:15,transition:"background 0.15s, box-shadow 0.15s"}}),
-            (0,P.jsx)("div",{style:{position:"absolute",top:"50%",left:0,right:0,height:"1px",background:isCenterY ? "#38bdf8" : "rgba(255,255,255,0.18)",boxShadow:isCenterY ? "0 0 8px #38bdf8" : "none",pointerEvents:"none",zIndex:15,transition:"background 0.15s, box-shadow 0.15s"}}),
-            // Center crosshair marker in exact center of media
-            (0,P.jsx)("div",{style:{position:"absolute",left:"calc(50% - 4px)",top:"calc(50% - 4px)",width:"8px",height:"8px",borderRadius:"50%",border:"1.5px solid " + ((isCenterX&&isCenterY) ? "#38bdf8" : "rgba(255,255,255,0.4)"),pointerEvents:"none",zIndex:16}})
-          ]}),
-
-          // Standard Interactive Crop Box
-          !isPerspective && (0,P.jsxs)("div",{
-            onMouseDown: e=>handlePointerDown(e, "move"),
-            style: {
-              position: "absolute",
-              left: (cropNorm.x * 100) + "%",
-              top: (cropNorm.y * 100) + "%",
-              width: (cropNorm.w * 100) + "%",
-              height: (cropNorm.h * 100) + "%",
-              border: (isCenterX && isCenterY) ? "2px solid #38bdf8" : "2px solid var(--primary-color)",
-              boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.58)",
-              cursor: "move",
-              boxSizing: "border-box",
-              zIndex: 20
-            },
-            children: [
-              // Rule-of-thirds grid lines
-              (0,P.jsx)("div",{style:{position:"absolute",left:"33.33%",top:0,bottom:0,width:"1px",background:"rgba(255,255,255,0.35)",pointerEvents:"none"}}),
-              (0,P.jsx)("div",{style:{position:"absolute",left:"66.66%",top:0,bottom:0,width:"1px",background:"rgba(255,255,255,0.35)",pointerEvents:"none"}}),
-              (0,P.jsx)("div",{style:{position:"absolute",top:"33.33%",left:0,right:0,height:"1px",background:"rgba(255,255,255,0.35)",pointerEvents:"none"}}),
-              (0,P.jsx)("div",{style:{position:"absolute",top:"66.66%",left:0,right:0,height:"1px",background:"rgba(255,255,255,0.35)",pointerEvents:"none"}}),
-
-              // Crop box internal center crosshair lines
-              (0,P.jsx)("div",{style:{position:"absolute",left:"50%",top:0,bottom:0,width:"1px",borderLeft:"1px dashed rgba(255,255,255,0.45)",pointerEvents:"none"}}),
-              (0,P.jsx)("div",{style:{position:"absolute",top:"50%",left:0,right:0,height:"1px",borderTop:"1px dashed rgba(255,255,255,0.45)",pointerEvents:"none"}}),
-              
-              // 4 Corner Handles
-              (0,P.jsx)("div",{onMouseDown:e=>handlePointerDown(e, "nw"),style:{position:"absolute",top:"-6px",left:"-6px",width:"12px",height:"12px",background:(isCenterX && isCenterY) ? "#38bdf8" : "var(--primary-color)",border:"2px solid #FFFFFF",borderRadius:"3px",cursor:"nwse-resize",zIndex:30}}),
-              (0,P.jsx)("div",{onMouseDown:e=>handlePointerDown(e, "ne"),style:{position:"absolute",top:"-6px",right:"-6px",width:"12px",height:"12px",background:(isCenterX && isCenterY) ? "#38bdf8" : "var(--primary-color)",border:"2px solid #FFFFFF",borderRadius:"3px",cursor:"nesw-resize",zIndex:30}}),
-              (0,P.jsx)("div",{onMouseDown:e=>handlePointerDown(e, "se"),style:{position:"absolute",bottom:"-6px",right:"-6px",width:"12px",height:"12px",background:(isCenterX && isCenterY) ? "#38bdf8" : "var(--primary-color)",border:"2px solid #FFFFFF",borderRadius:"3px",cursor:"nwse-resize",zIndex:30}}),
-              (0,P.jsx)("div",{onMouseDown:e=>handlePointerDown(e, "sw"),style:{position:"absolute",bottom:"-6px",left:"-6px",width:"12px",height:"12px",background:(isCenterX && isCenterY) ? "#38bdf8" : "var(--primary-color)",border:"2px solid #FFFFFF",borderRadius:"3px",cursor:"nesw-resize",zIndex:30}}),
-
-              // Dimension & alignment badge
-              (0,P.jsxs)("div",{style:{position:"absolute",bottom:"6px",left:"6px",fontSize:"10px",fontWeight:"800",color:"#FFFFFF",background:"rgba(0,0,0,0.75)",padding:"3px 7px",borderRadius:"4px",pointerEvents:"none",border:"1px solid rgba(255,255,255,0.2)",display:"flex",alignItems:"center",gap:"4px"},children:[
-                calcCropPixels.w > 0 ? (calcCropPixels.w + " × " + calcCropPixels.h + " px") : (Math.round(cropNorm.w*100) + "% × " + Math.round(cropNorm.h*100) + "%"),
-                aspectRatio !== "free" && (0,P.jsx)("span",{style:{color:"var(--primary-color)",marginLeft:"2px"},children:"(" + aspectRatio + ")"}),
-                (isCenterX && isCenterY) && (0,P.jsx)("span",{style:{color:"#38bdf8",marginLeft:"3px"},children:"• Centered"})
-              ]})
-            ]
-          }),
-
-          // Perspective Keystone 4-Corner Handles
-          isPerspective && (0,P.jsxs)(P.Fragment,{children:[
-            (0,P.jsxs)("svg",{style:{position:"absolute",top:0,left:0,width:"100%",height:"100%",pointerEvents:"none"},children:[
-              (0,P.jsx)("polygon",{
-                points: corners.map(c=>(c.x*100)+"%,"+(c.y*100)+"%").join(" "),
-                fill: "rgba(77, 155, 34, 0.2)",
-                stroke: "var(--primary-color)",
-                strokeWidth: "2"
-              })
-            ]}),
-            corners.map((c, idx)=>(0,P.jsx)("div",{
-              key: idx,
-              onMouseDown: e=>handlePointerDown(e, "corner", idx),
-              style: {
-                position: "absolute",
-                left: "calc(" + (c.x*100) + "% - 8px)",
-                top: "calc(" + (c.y*100) + "% - 8px)",
-                width: "16px",
-                height: "16px",
-                borderRadius: "50%",
-                background: "var(--primary-color)",
-                border: "2px solid #FFFFFF",
-                boxShadow: "0 0 10px rgba(0,0,0,0.5)",
-                cursor: "crosshair",
-                zIndex: 30
-              },
-              title: "Drag corner pin " + (idx+1)
-            }))
-          ]})
-        ]})
-      ]}) : null,
+      (e.length > 0 && activeItem) ? renderCropCanvas(!1) : null,
 
       (0,P.jsx)(ProcessingQueue,{files:e,setFiles:t,activeFile:activeItem,onSelectFile:setActiveItem,successData:successData,onClearAll:()=>{t([]);setActiveItem(null);setSuccessData(null);},fileInputId:"crop-studio-add-file-input",acceptTypes:".jpg,.jpeg,.png,.webp,.bmp,.tiff,.mp4,.mov,.webm,.mkv",isDraggingFile:s,onOpenFullscreenPreview:d})
     ]}),
     
+    // Right sidebar
     (0,P.jsxs)("div",{className:"right-sidebar",children:[
       (0,P.jsxs)("div",{style:{display:"flex",alignItems:"center",gap:"10px",margin:"0 0 4px 0"},children:[
         (0,P.jsx)(pe,{size:20,color:"var(--primary-color)"}),
@@ -1117,7 +1415,6 @@ function CropStudio({files:e,setFiles:t,setGlobalProgress:n,explorerPreviewFile:
       ]}),
       (0,P.jsx)("p",{style:{color:"var(--color-slate)",fontSize:"11px",margin:"0 0 15px 0",lineHeight:"1.4"},children:"Interactive cropping & perspective correction for media."}),
       (0,P.jsxs)("div",{className:"sidebar-settings-content",children:[
-        // Preview Box in Right Sidebar (shows explorer preview file when queue empty OR active file when queue active)
         currentPreviewTarget && (0,P.jsxs)("div",{className:"animate-fade-in",style:{padding:"10px",background:"rgba(0,0,0,0.05)",borderRadius:"6px",marginBottom:"15px",border:"1px solid var(--glass-border)",textAlign:"center",position:"relative"},children:[
           d && (0,P.jsx)("button",{onClick:()=>d(currentPreviewTarget),className:"btn-secondary",style:{position:"absolute",top:"6px",right:"6px",padding:"4px",borderRadius:"4px",background:"rgba(0,0,0,0.5)",border:"none",cursor:"pointer",zIndex:5},title:"Open Fullscreen Preview",children:(0,P.jsx)(ve,{size:12,color:"#FFFFFF"})}),
           /\.(mp4|webm|mkv|mov|avi)$/i.test(currentPreviewTarget.path||currentPreviewTarget.name||currentPreviewTarget||"") ? (
@@ -1128,123 +1425,79 @@ function CropStudio({files:e,setFiles:t,setGlobalProgress:n,explorerPreviewFile:
           (0,P.jsx)("div",{style:{fontSize:"11px",fontWeight:"bold",color:"var(--color-white)",marginTop:"8px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"},children:currentPreviewTarget.name||(typeof currentPreviewTarget==='string'?currentPreviewTarget.split(/[\\/]/).pop():"Selected Preview")})
         ]}),
 
-        (0,P.jsxs)("div",{style:{marginBottom:"18px"},children:[
-          (0,P.jsxs)("div",{onClick:()=>setSecCrop(!secCrop),style:{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",padding:"6px 0",borderBottom:"1px solid var(--glass-border)",marginBottom:"10px"},children:[
-            (0,P.jsxs)("div",{style:{display:"flex",alignItems:"center",gap:"8px"},children:[
-              (0,P.jsx)(pe,{size:13,color:"var(--primary-color)"}),
-              (0,P.jsx)("span",{style:{fontSize:"11px",fontWeight:"bold",color:"var(--color-white)",textTransform:"uppercase",letterSpacing:"0.5px"},children:"Aspect Ratio & Presets"})
-            ]}),
-            (0,P.jsx)("span",{style:{fontSize:"10px",color:"var(--color-slate)"},children:secCrop?"▼":"▶"})
-          ]}),
-          secCrop&&(0,P.jsxs)("div",{className:"animate-fade-in",style:{padding:"2px 0",display:"flex",flexDirection:"column",gap:"12px"},children:[
-            (0,P.jsxs)("div",{children:[
-              (0,P.jsx)("span",{className:"form-label",style:{fontSize:"10px",marginBottom:"6px",display:"block"},children:"Crop Mode"}),
-              (0,P.jsxs)("div",{className:"clean-preset-grid",style:{gridTemplateColumns:"1fr 1fr",marginBottom:"8px"},children:[
-                (0,P.jsx)("button",{type:"button",className:"clean-preset-btn " + (!isPerspective?"active":""),onClick:()=>setIsPerspective(!1),style:{padding:"7px 0",fontSize:"10px",fontWeight:"700"},children:"Standard Crop"}),
-                (0,P.jsx)("button",{type:"button",className:"clean-preset-btn " + (isPerspective?"active":""),onClick:()=>setIsPerspective(!0),style:{padding:"7px 0",fontSize:"10px",fontWeight:"700"},children:"Perspective Keystone"})
-              ]})
-            ]}),
-            !isPerspective&&(0,P.jsxs)("div",{children:[
-              (0,P.jsxs)("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"6px"},children:[
-                (0,P.jsx)("span",{className:"form-label",style:{fontSize:"10px",margin:0},children:"Aspect Ratio"}),
-                (0,P.jsxs)("div",{style:{display:"flex",gap:"4px"},children:[
-                  [{id:"all",label:"All"},{id:"landscape",label:"Landscape"},{id:"portrait",label:"Portrait"},{id:"standard",label:"Square"}].map(cat=>(
-                    (0,P.jsx)("button",{
-                      key: cat.id,
-                      type: "button",
-                      onClick:()=>setPresetCategory(cat.id),
-                      style: {
-                        background: presetCategory===cat.id ? "var(--primary-color)" : "transparent",
-                        color: presetCategory===cat.id ? "#FFFFFF" : "var(--color-slate)",
-                        border: "none",
-                        borderRadius: "4px",
-                        padding: "2px 6px",
-                        fontSize: "9px",
-                        fontWeight: "700",
-                        cursor: "pointer",
-                        transition: "all 0.15s"
-                      },
-                      children: cat.label
-                    })
-                  ))
-                ]})
-              ]}),
-              // Sleek Tile Preset Grid matching the design reference
-              (0,P.jsx)("div",{style:{display:"grid",gridTemplateColumns:"repeat(3, 1fr)",gap:"6px"},children:
-                filteredPresets.map(p=>{
-                  let isActive = aspectRatio === p.id;
-                  return (0,P.jsxs)("button",{
-                    key: p.id,
-                    type: "button",
-                    onClick:()=>applyPresetRatio(p.id),
-                    className: "clean-preset-btn " + (isActive ? "active" : ""),
-                    style: {
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      padding: "10px 4px",
-                      borderRadius: "8px",
-                      cursor: "pointer",
-                      gap: "5px",
-                      minHeight: "56px",
-                      border: isActive ? "1px solid var(--primary-color)" : "1px solid var(--glass-border)",
-                      background: isActive ? "rgba(77, 155, 34, 0.14)" : "rgba(255, 255, 255, 0.02)"
-                    },
-                    title: p.sub,
-                    children: [
-                      (0,P.jsx)("div",{style:{color: isActive ? "var(--primary-color)" : "var(--color-white)",display:"flex",alignItems:"center",justifyContent:"center"},children: renderAspectIcon(p.iconType)}),
-                      (0,P.jsx)("span",{style:{fontSize:"11px",fontWeight:"800",color: isActive ? "var(--primary-color)" : "var(--color-white)",letterSpacing:"0.3px"},children: p.label}),
-                      (0,P.jsx)("span",{style:{fontSize:"8px",color: isActive ? "var(--primary-color)" : "var(--color-slate)",fontWeight:"600",textTransform:"none"},children: p.sub})
-                    ]
-                  });
-                })
-              })
-            ]}),
-            !isPerspective&&(0,P.jsx)("button",{
-              type:"button",
-              onClick:centerCropBox,
-              className:"btn-secondary",
-              style:{padding:"6px 0",fontSize:"10px",justifyContent:"center",fontWeight:"700",width:"100%",color:(isCenterX && isCenterY) ? "#38bdf8" : "inherit",border:(isCenterX && isCenterY) ? "1px solid rgba(56, 189, 248, 0.4)" : "1px solid var(--glass-border)"},
-              children:"⌖ Align To Center"
-            }),
-            (0,P.jsxs)("div",{children:[
-              (0,P.jsx)("span",{className:"form-label",style:{fontSize:"10px",marginBottom:"6px",display:"block"},children:"Rotate & Flip"}),
-              (0,P.jsxs)("div",{style:{display:"grid",gridTemplateColumns:"repeat(4, 1fr)",gap:"6px"},children:[
-                (0,P.jsx)("button",{type:"button",className:"btn-secondary",onClick:()=>setRotate(r=>(r-90+360)%360),style:{padding:"6px 0",fontSize:"10px",justifyContent:"center",fontWeight:"700"},title:"Rotate Left 90°",children:"↺ -90°"}),
-                (0,P.jsx)("button",{type:"button",className:"btn-secondary",onClick:()=>setRotate(r=>(r+90)%360),style:{padding:"6px 0",fontSize:"10px",justifyContent:"center",fontWeight:"700"},title:"Rotate Right 90°",children:"↻ +90°"}),
-                (0,P.jsx)("button",{type:"button",className:"clean-preset-btn " + (flipH?"active":""),onClick:()=>setFlipH(!flipH),style:{padding:"6px 0",fontSize:"10px",justifyContent:"center",fontWeight:"700"},title:"Flip Horizontal",children:"⇄ Flip H"}),
-                (0,P.jsx)("button",{type:"button",className:"clean-preset-btn " + (flipV?"active":""),onClick:()=>setFlipV(!flipV),style:{padding:"6px 0",fontSize:"10px",justifyContent:"center",fontWeight:"700"},title:"Flip Vertical",children:"⇅ Flip V"})
-              ]})
-            ]})
-          ]})
-        ]}),
-
-        (0,P.jsxs)("div",{style:{marginBottom:"20px"},children:[
-          (0,P.jsxs)("div",{onClick:()=>setSecDest(!secDest),style:{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",padding:"6px 0",borderBottom:"1px solid var(--glass-border)",marginBottom:"10px"},children:[
-            (0,P.jsxs)("div",{style:{display:"flex",alignItems:"center",gap:"8px"},children:[
-              (0,P.jsx)(ue,{size:13,color:"var(--primary-color)"}),
-              (0,P.jsx)("span",{style:{fontSize:"11px",fontWeight:"bold",color:"var(--color-white)",textTransform:"uppercase",letterSpacing:"0.5px"},children:"Save Destination"})
-            ]}),
-            (0,P.jsx)("span",{style:{fontSize:"10px",color:"var(--color-slate)"},children:secDest?"▼":"▶"})
-          ]}),
-          secDest&&(0,P.jsxs)("div",{className:"animate-fade-in",style:{padding:"2px 0"},children:[
-            (0,P.jsx)("span",{className:"form-label",style:{fontSize:"10px"},children:"Target Directory"}),
-            (0,P.jsxs)("div",{className:"clean-preset-grid",style:{gridTemplateColumns:"1fr 1fr 1.2fr"},children:[
-              (0,P.jsx)("button",{type:"button",className:"clean-preset-btn " + (saveDest==="original"?"active":""),onClick:()=>setSaveDest("original"),style:{padding:"6px 4px",fontSize:"9.5px"},children:"Original"}),
-              (0,P.jsx)("button",{type:"button",className:"clean-preset-btn " + (saveDest==="default"?"active":""),onClick:()=>setSaveDest("default"),style:{padding:"6px 4px",fontSize:"9.5px"},children:"Default"}),
-              (0,P.jsx)("button",{type:"button",className:"clean-preset-btn " + (saveDest==="custom"?"active":""),onClick:()=>o(customDest,path=>{setCustomDest(path);setSaveDest("custom");}),style:{padding:"6px 4px",fontSize:"9.5px"},children:"Custom..."})
-            ]}),
-            (0,P.jsxs)("span",{style:{fontSize:"9px",color:"var(--color-slate)",fontStyle:"italic",display:"block",marginTop:"4px",textOverflow:"ellipsis",overflow:"hidden",whiteSpace:"nowrap"},title:saveDest==="original"?"Original file directory":saveDest==="default"?localStorage.getItem("rfine_def_save_dir")||"Default folder not set":customDest||"No folder selected",children:["Saving to: ",saveDest==="original"?"Original Folder":saveDest==="default"?localStorage.getItem("rfine_def_save_dir")||"Default not set":customDest?fA.basename(customDest):"Not configured"]}),
-            (0,P.jsxs)("div",{style:{display:"flex",alignItems:"center",gap:"8px",marginTop:"12px"},children:[
-              (0,P.jsx)("input",{type:"checkbox",id:"chk-crop-open-folder",checked:autoOpen,onChange:e=>setAutoOpen(e.target.checked)}),
-              (0,P.jsx)("label",{htmlFor:"chk-crop-open-folder",style:{fontSize:"11px",color:"var(--color-white)",cursor:"pointer"},children:"Auto-Open Output Directory"})
-            ]})
-          ]})
-        ]})
+        renderCropSettings()
       ]}),
       (0,P.jsx)("div",{style:{paddingTop:"15px",borderTop:"1px solid var(--glass-border)",marginTop:"auto"},children:(0,P.jsx)("button",{onClick:handleProcess,disabled:isProcessing||e.length===0,className:"btn-primary",style:{width:"100%",padding:"12px 16px",fontSize:"12px",fontWeight:"bold",justifyContent:"center",letterSpacing:"0.5px",background:"var(--primary-color)",color:"#FFFFFF"},children:isProcessing?"PROCESSING...":"CROP SELECTED"})})
-    ]})
+    ]}),
+
+    // Dedicated Enlarge / Focused Full-Canvas Crop View Overlay Modal
+    isFocusedMode && (0,P.jsx)("div",{
+      className:"animate-fade-in",
+      style:{
+        position:"fixed",
+        top:0,
+        left:0,
+        right:0,
+        bottom:0,
+        zIndex:9999,
+        background:"rgba(10, 15, 24, 0.94)",
+        backdropFilter:"blur(16px)",
+        display:"flex",
+        flexDirection:"row",
+        padding:"16px",
+        gap:"16px",
+        boxSizing:"border-box"
+      },
+      children:[
+        // Focused Huge Canvas Area (Contains the single unified "✓ Done" button)
+        (0,P.jsx)("div",{
+          style:{
+            flex:1,
+            height:"100%",
+            display:"flex",
+            flexDirection:"column",
+            position:"relative",
+            background:"rgba(0, 0, 0, 0.35)",
+            borderRadius:"12px",
+            border:"1px solid var(--glass-border)",
+            overflow:"hidden"
+          },
+          children: renderCropCanvas(!0)
+        }),
+
+        // Focused Side Controls Drawer
+        (0,P.jsxs)("div",{
+          style:{
+            width:"340px",
+            flexShrink:0,
+            height:"100%",
+            background:"var(--glass-bg)",
+            backdropFilter:"blur(20px)",
+            borderRadius:"12px",
+            border:"1px solid var(--glass-border)",
+            display:"flex",
+            flexDirection:"column",
+            padding:"20px",
+            boxSizing:"border-box",
+            overflowY:"auto"
+          },
+          children:[
+            (0,P.jsxs)("div",{style:{display:"flex",alignItems:"center",gap:"8px",marginBottom:"16px"},children:[
+              (0,P.jsx)(pe,{size:20,color:"var(--primary-color)"}),
+              (0,P.jsx)("h3",{style:{fontSize:"16px",fontWeight:"800",margin:0,color:"var(--color-white)"},children:"Crop Studio"})
+            ]}),
+            (0,P.jsx)("div",{style:{flex:1,overflowY:"auto"},children: renderCropSettings()}),
+            (0,P.jsx)("div",{style:{paddingTop:"16px",borderTop:"1px solid var(--glass-border)",marginTop:"auto"},children:(0,P.jsx)("button",{
+              onClick:()=>{handleProcess(); setIsFocusedMode(!1);},
+              disabled:isProcessing||e.length===0,
+              className:"btn-primary",
+              style:{width:"100%",padding:"12px 16px",fontSize:"12px",fontWeight:"bold",justifyContent:"center",letterSpacing:"0.5px",background:"var(--primary-color)",color:"#FFFFFF"},
+              children:isProcessing?"PROCESSING...":"CROP SELECTED"
+            })})
+          ]
+        })
+      ]
+    })
   ]});
 }
 function VectorStudio({files:e,setFiles:t,setGlobalProgress:n,explorerPreviewFile:r,setExplorerPreviewFile:i,theme:a,openFolderPicker:o,isDraggingFile:s,explorerHeight:c,setExplorerHeight:l,addRecentProcess:u,onOpenFullscreenPreview:d}){
