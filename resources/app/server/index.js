@@ -18,6 +18,7 @@ ffmpeg.setFfprobePath(ffprobePath);
 
 import { exec } from 'child_process';
 import os from 'os';
+import zlib from 'zlib';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import { fileURLToPath } from 'url';
 
@@ -102,6 +103,95 @@ function parseDynamicTags(text, { index = 1, total = 1, originalName = '', paren
     .replace(/\{parent\}/gi, parentFolder)
     .replace(/\{ext\}/gi, ext.replace(/^\./, ''))
     .replace(/\{name\}/gi, originalName);
+}
+// ZIP Archive Builder using core zlib & CRC32
+const crcTable = new Uint32Array(256);
+for (let i = 0; i < 256; i++) {
+  let c = i;
+  for (let k = 0; k < 8; k++) {
+    c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+  }
+  crcTable[i] = c >>> 0;
+}
+
+function calculateCrc32(buf) {
+  let crc = 0 ^ (-1);
+  for (let i = 0; i < buf.length; i++) {
+    crc = (crc >>> 8) ^ crcTable[(crc ^ buf[i]) & 0xff];
+  }
+  return (crc ^ (-1)) >>> 0;
+}
+
+function buildZipArchive(entries) {
+  // entries: Array<{ name: string, data: Buffer }>
+  const localHeaders = [];
+  const centralHeaders = [];
+  let offset = 0;
+
+  for (const entry of entries) {
+    const nameBuf = Buffer.from(entry.name, 'utf8');
+    const dataBuf = entry.data;
+    const crc = calculateCrc32(dataBuf);
+    const uncompressedSize = dataBuf.length;
+    const compressedData = zlib.deflateRawSync(dataBuf);
+    const compressedSize = compressedData.length;
+
+    // Local file header (30 bytes + filename)
+    const lh = Buffer.alloc(30 + nameBuf.length);
+    lh.writeUInt32LE(0x04034b50, 0);
+    lh.writeUInt16LE(20, 4);
+    lh.writeUInt16LE(0, 6);
+    lh.writeUInt16LE(8, 8);
+    lh.writeUInt16LE(0, 10);
+    lh.writeUInt16LE(0, 12);
+    lh.writeUInt32LE(crc, 14);
+    lh.writeUInt32LE(compressedSize, 18);
+    lh.writeUInt32LE(uncompressedSize, 22);
+    lh.writeUInt16LE(nameBuf.length, 26);
+    lh.writeUInt16LE(0, 28);
+    nameBuf.copy(lh, 30);
+
+    localHeaders.push(lh, compressedData);
+
+    // Central directory file header (46 bytes + filename)
+    const ch = Buffer.alloc(46 + nameBuf.length);
+    ch.writeUInt32LE(0x02014b50, 0);
+    ch.writeUInt16LE(20, 4);
+    ch.writeUInt16LE(20, 6);
+    ch.writeUInt16LE(0, 8);
+    ch.writeUInt16LE(8, 10);
+    ch.writeUInt16LE(0, 12);
+    ch.writeUInt16LE(0, 14);
+    ch.writeUInt32LE(crc, 16);
+    ch.writeUInt32LE(compressedSize, 20);
+    ch.writeUInt32LE(uncompressedSize, 24);
+    ch.writeUInt16LE(nameBuf.length, 28);
+    ch.writeUInt16LE(0, 30);
+    ch.writeUInt16LE(0, 32);
+    ch.writeUInt16LE(0, 34);
+    ch.writeUInt16LE(0, 36);
+    ch.writeUInt32LE(0, 38);
+    ch.writeUInt32LE(offset, 42);
+    nameBuf.copy(ch, 46);
+
+    centralHeaders.push(ch);
+    offset += lh.length + compressedData.length;
+  }
+
+  const centralDirOffset = offset;
+  const centralDirSize = centralHeaders.reduce((sum, h) => sum + h.length, 0);
+
+  const eocd = Buffer.alloc(22);
+  eocd.writeUInt32LE(0x06054b50, 0);
+  eocd.writeUInt16LE(0, 4);
+  eocd.writeUInt16LE(0, 6);
+  eocd.writeUInt16LE(entries.length, 8);
+  eocd.writeUInt16LE(entries.length, 10);
+  eocd.writeUInt32LE(centralDirSize, 12);
+  eocd.writeUInt32LE(centralDirOffset, 16);
+  eocd.writeUInt16LE(0, 20);
+
+  return Buffer.concat([...localHeaders, ...centralHeaders, eocd]);
 }
 
 app.get('/api/explorer/roots', (req, res) => {
@@ -787,12 +877,91 @@ app.post('/api/image/save-still', (req, res) => {
   }
   
   const outputPath = path.join(targetDir, filename);
-  fs.writeFile(outputPath, buffer, (err) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
+  const ext = path.extname(filename).toLowerCase().replace('.', '');
+
+  (async () => {
+    try {
+      if (ext === 'jpg' || ext === 'jpeg') {
+        await sharp(buffer).jpeg({ quality: 92, mozjpeg: true }).toFile(outputPath);
+      } else if (ext === 'webp') {
+        await sharp(buffer).webp({ quality: 90 }).toFile(outputPath);
+      } else if (ext === 'avif') {
+        await sharp(buffer).avif({ quality: 85 }).toFile(outputPath);
+      } else {
+        await fs.promises.writeFile(outputPath, buffer);
+      }
+      res.json({ success: true, targetFolder: targetDir, outputPath });
+    } catch (err) {
+      console.error("Save still error:", err);
+      // Fallback direct buffer write
+      fs.writeFile(outputPath, buffer, (fallbackErr) => {
+        if (fallbackErr) return res.status(500).json({ error: fallbackErr.message });
+        res.json({ success: true, targetFolder: targetDir, outputPath });
+      });
     }
-    res.json({ success: true, targetFolder: targetDir });
-  });
+  })();
+});
+
+// Save Batch of items into a single .ZIP Archive
+app.post('/api/archive/save-zip', async (req, res) => {
+  const { zipFilename = 'export.zip', outputFolder, items = [] } = req.body;
+  if (!items || items.length === 0) {
+    return res.status(400).json({ error: 'No items provided to zip' });
+  }
+
+  let targetDir = outputFolder ? outputFolder.trim() : path.join(process.cwd(), 'downloads');
+  try {
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+    }
+  } catch (e) {
+    targetDir = process.cwd();
+  }
+
+  try {
+    const zipEntries = [];
+    for (const item of items) {
+      if (item.dataUrl) {
+        const base64Data = item.dataUrl.replace(/^data:image\/\w+;base64,/, "");
+        let fileBuffer = Buffer.from(base64Data, 'base64');
+        const ext = path.extname(item.name || 'frame.png').toLowerCase().replace('.', '');
+        
+        if (ext === 'jpg' || ext === 'jpeg') {
+          fileBuffer = await sharp(fileBuffer).jpeg({ quality: 92, mozjpeg: true }).toBuffer();
+        } else if (ext === 'webp') {
+          fileBuffer = await sharp(fileBuffer).webp({ quality: 90 }).toBuffer();
+        }
+
+        zipEntries.push({
+          name: item.name || `frame_${Date.now()}.png`,
+          data: fileBuffer
+        });
+      } else if (item.path && fs.existsSync(item.path)) {
+        zipEntries.push({
+          name: item.name || path.basename(item.path),
+          data: fs.readFileSync(item.path)
+        });
+      }
+    }
+
+    if (zipEntries.length === 0) {
+      return res.status(400).json({ error: 'No valid file entries to zip' });
+    }
+
+    const zipBuffer = buildZipArchive(zipEntries);
+    const resolved = resolveCollisionPath(path.join(targetDir, zipFilename));
+    fs.writeFileSync(resolved.path, zipBuffer);
+
+    res.json({
+      success: true,
+      targetFolder: targetDir,
+      zipPath: resolved.path,
+      itemCount: zipEntries.length
+    });
+  } catch (err) {
+    console.error("ZIP creation error:", err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ----------------------------------------------------------------------------
