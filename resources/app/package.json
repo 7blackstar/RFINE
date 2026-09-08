@@ -18,7 +18,7 @@
     "sharp": "^0.33.4"
   },
   "build": {
-    "appId": "com.7blackstar.rfine",
+    "appId": "com.rfine.app",
     "productName": "RFINE",
     "copyright": "Copyright © 2026 7blackstar",
     "directories": {
@@ -27,26 +27,42 @@
     "files": [
       "**/*",
       "!**/*.ts",
-      "!*.map"
+      "!**/*.map",
+      "!server/temp/**/*",
+      "!server/output/**/*",
+      "!client/src/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "server/bin",
+        "to": "bin",
+        "filter": [
+          "**/*"
+        ]
+      }
     ],
     "win": {
       "target": [
-        "nsis"
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
-      "icon": "assets/icon.ico"
+      "icon": "client/public/favicon.ico",
+      "artifactName": "RFINE-Setup-1.3.8.exe"
     },
     "nsis": {
       "oneClick": true,
       "perMachine": false,
       "allowToChangeInstallationDirectory": false,
+      "deleteAppDataOnUninstall": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "RFINE",
-      "runAfterFinish": true,
-      "artifactName": "RFINE-Setup-1.3.6.exe"
-    },
-    "electronVersion": "30.0.0",
-    "artifactName": "RFINE-Setup-1.3.6.exe"
+      "artifactName": "RFINE-Setup-1.3.8.exe"
+    }
   },
   "devDependencies": {
     "electron": "^30.0.0"
