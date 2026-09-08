@@ -83,6 +83,12 @@ body:has(.clean-sidebar.collapsed) .global-sticky-bottom-bar,
   left: 64px !important;
 }
 
+body:has([style*="z-index: 9999"]) .global-sticky-bottom-bar,
+body:has([style*="z-index:9999"]) .global-sticky-bottom-bar,
+body:has(.animate-fade-in[style*="fixed"]) .global-sticky-bottom-bar {
+  display: none !important;
+}
+
 
 /* ======================================================== */
 /* 3-TIER ELEVATION THEME SYSTEM                            */
